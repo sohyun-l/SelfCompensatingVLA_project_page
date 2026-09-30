@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="description"
+        content="Taming VLAs under Robot Execution Errors: Self-Compensation and Stress Testing">
+  <meta name="keywords" content="Vision-Language-Action, VLA, Robustness, Execution Errors, Test-time Adaptation, RoboStress">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Taming VLAs under Robot Execution Errors</title>
+
+  <link href="https://fonts.googleapis.com/css?family=Google+Sans|Noto+Sans|Castoro"
+        rel="stylesheet">
+
+  <link rel="stylesheet" href="./static/css/bulma.min.css">
+  <link rel="stylesheet" href="./static/css/bulma-carousel.min.css">
+  <link rel="stylesheet" href="./static/css/bulma-slider.min.css">
+  <link rel="stylesheet" href="./static/css/fontawesome.all.min.css">
+  <link rel="stylesheet"
+        href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
+  <link rel="stylesheet" href="./static/css/index.css">
+  <link rel="icon" href="./static/images/favicon.svg">
+
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+  <script defer src="./static/js/fontawesome.all.min.js"></script>
+  <script src="./static/js/bulma-carousel.min.js"></script>
+  <script src="./static/js/bulma-slider.min.js"></script>
+  <script src="./static/js/index.js"></script>
+
+  <style>
+    .figure-caption { font-size: 0.95rem; color: #555; margin-top: 0.5rem; text-align: justify; }
+    .result-table { overflow-x: auto; margin: 1rem 0 0.5rem; }
+    .result-table table { margin: 0 auto; font-size: 0.9rem; }
+    .result-table th, .result-table td { text-align: center !important; vertical-align: middle !important; white-space: nowrap; }
+    .result-table td:first-child, .result-table th:first-child { text-align: left !important; }
+    .result-table .ours { background-color: #eef6fc; }
+    .result-table tr.avg td { border-top: 2px solid #dbdbdb; font-weight: bold; }
+    .stat-box { text-align: center; }
+    .stat-box .stat { font-family: 'Google Sans', sans-serif; font-size: 1.9rem; font-weight: bold; color: #3273dc; line-height: 1.1; white-space: nowrap; }
+    .stat-box .stat-label { font-size: 0.9rem; color: #555; margin-top: 0.3rem; }
+    .check { color: #3273dc; }
+  </style>
+</head>
+<body>
+
+<nav class="navbar" role="navigation" aria-label="main navigation">
+  <div class="navbar-brand">
+    <a role="button" class="navbar-burger" aria-label="menu" aria-expanded="false">
+      <span aria-hidden="true"></span>
+      <span aria-hidden="true"></span>
+      <span aria-hidden="true"></span>
+    </a>
+  </div>
+  <div class="navbar-menu">
+    <div class="navbar-start" style="flex-grow: 1; justify-content: center;">
+      <a class="navbar-item" href="https://sohyun-l.github.io">
+      <span class="icon">
+          <i class="fas fa-home"></i>
+      </span>
+      </a>
+    </div>
+  </div>
+</nav>
+
+
+<section class="hero">
+  <div class="hero-body">
+    <div class="container is-max-desktop">
+      <div class="columns is-centered">
+        <div class="column has-text-centered">
+          <h1 class="title is-1 publication-title">Taming VLAs under Robot Execution Errors: Self-Compensation and Stress Testing</h1>
+          <div class="is-size-5 publication-authors">
+            <span class="author-block">
+              <a href="https://sohyun-l.github.io">Sohyun Lee</a><sup>1*</sup>,</span>
+            <span class="author-block">
+              Yoonjae Baek<sup>1*</sup>,</span>
+            <span class="author-block">
+              Jaesang Won<sup>1</sup>,</span>
+            <span class="author-block">
+              Jinnyeong Kim<sup>1</sup>,</span>
+            <br>
+            <span class="author-block">
+              Hyunwoo Kang<sup>1</sup>,</span>
+            <span class="author-block">
+              Seung-Hwan Baek<sup>1</sup>,</span>
+            <span class="author-block">
+              Ivan Laptev<sup>2</sup>,</span>
+            <span class="author-block">
+              <a href="https://suhakwak.github.io/">Suha Kwak</a><sup>1</sup></span>
+          </div>
+
+          <div class="is-size-5 publication-authors">
+            <span class="author-block"><sup>1</sup>POSTECH,</span>
+            <span class="author-block"><sup>2</sup>MBZUAI</span>
+          </div>
+
+          <div class="is-size-6 publication-authors" style="color: #777;">
+            <span class="author-block"><sup>*</sup>Equal contribution</span>
+          </div>
+
+          <div class="column has-text-centered">
+            <div class="publication-links">
+              <!-- PDF Link. -->
+              <span class="link-block">
+                <a href="https://arxiv.org/pdf/2609.37334"
+                   class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon">
+                      <i class="fas fa-file-pdf"></i>
+                  </span>
+                  <span>Paper</span>
+                </a>
+              </span>
+              <span class="link-block">
+                <a href="https://arxiv.org/abs/2609.37334"
+                   class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon">
+                      <i class="ai ai-arxiv"></i>
+                  </span>
+                  <span>arXiv</span>
+                </a>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- Teaser -->
+<section class="hero is-light is-small">
+  <div class="hero-body">
+    <div class="container is-max-desktop">
+      <div class="columns is-centered has-text-centered">
+        <div class="column">
+          <img src="./static/images/teaser.png" alt="Overview: (a) self-compensating VLA updates the policy online from command-execution residuals; (b) RoboStress combines joint-level noise models into deployment scenarios." style="width: 100%;">
+          <p class="figure-caption">
+            <b>(a) Self-compensating VLA</b> updates the policy online using command-execution residuals and generates subsequent commands that pre-compensate for execution errors.
+            <b>(b) RoboStress</b> combines four established joint-level models into controlled deployment scenarios in simulation to stress-test VLA robustness.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- Abstract -->
+<section class="section">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered has-text-centered">
+      <div class="column is-four-fifths">
+        <h2 class="title is-3">Abstract</h2>
+        <div class="content has-text-justified">
+          <p>
+            Vision-language-action (VLA) policies often fail when a robot's executed motion deviates from their commanded action. Such execution errors arise from the robot's mechanics and operating conditions, such as wear and payload changes. We propose self-compensating VLA, a deployment-time adaptation method that enables a VLA policy to pre-compensate for the robot's execution errors when generating commands. Without task rewards or labels, it updates the policy online using the residual between the action commanded by a VLA and the motion executed by the robot. To stress-test VLA robustness across execution conditions that are impractical to cover with physical robots alone, we introduce RoboStress, a controlled simulation benchmark. It combines established joint-level models of friction, backlash, compliance, and gravity-compensation error into seven deployment scenarios whose execution errors depend on the robot's state and motion history. On RoboStress, self-compensating VLA achieves higher average task success than both the base policies and methods that build in robustness during training. On two physical robot arms with different usage histories, it raises the average task success rate by more than 30 percentage points on each arm, and the gains extend to objects not seen in the task demonstrations.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Key numbers -->
+    <div class="columns is-centered" style="margin-top: 1rem;">
+      <div class="column is-four-fifths">
+        <div class="columns is-mobile is-multiline">
+          <div class="column is-half-mobile stat-box">
+            <div class="stat">49.1 &rarr; 56.6</div>
+            <div class="stat-label">RoboStress avg. success (%), &pi;<sub>0.5</sub></div>
+          </div>
+          <div class="column is-half-mobile stat-box">
+            <div class="stat">43 &rarr; 76</div>
+            <div class="stat-label">Real Robot A avg. success (%), &pi;<sub>0.5</sub></div>
+          </div>
+          <div class="column is-half-mobile stat-box">
+            <div class="stat">43 &rarr; 74</div>
+            <div class="stat-label">Real Robot B (1-year-old) avg. success (%), &pi;<sub>0.5</sub></div>
+          </div>
+          <div class="column is-half-mobile stat-box">
+            <div class="stat">16 &rarr; 64</div>
+            <div class="stat-label">Unseen objects success (%), &pi;<sub>0.5</sub></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- Method -->
+<section class="section">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered has-text-centered">
+      <div class="column">
+        <h2 class="title is-3">Self-compensating VLA</h2>
+        <img src="./static/images/method.png" alt="Method overview of self-compensating VLA" style="width: 100%;">
+        <p class="figure-caption">
+          A frozen VLA with trainable LoRA adapters predicts an action chunk, which the robot executes.
+          The residual &eta;<sup>obs</sup> between the commanded and executed motion forms a pseudo-target a<sup>target</sup>, which the compensation objective uses to update only the LoRA adapters online during deployment.
+        </p>
+        <div class="content has-text-justified" style="margin-top: 1.5rem;">
+          <p>
+            <b>Compensation signal.</b>
+            At each executed step, we measure the residual between the executed and commanded end-effector motion,
+            &eta;<sup>obs</sup> = &Delta;x &minus; a<sup>policy</sup>, from proprioception alone.
+            Because it only requires issued commands and proprioceptive measurements, the residual is a self-supervisory signal available on any deployed robot, with no task rewards, labels, or knowledge of the error sources.
+          </p>
+          <p>
+            <b>Deployment-time policy adaptation.</b>
+            We build a compensated pseudo-target a<sup>target</sup> = a<sup>policy</sup> &minus; &eta;<sup>obs</sup> and update rank-4 LoRA adapters on the action expert of &pi;<sub>0</sub> / &pi;<sub>0.5</sub> with a flow-matching objective toward this target, plus an anchor term that limits parameter drift.
+            The adapted policy then generates subsequent commands that pre-compensate for the observed execution errors, while the robot's low-level controller stays unchanged.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- RoboStress -->
+<section class="section">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered has-text-centered">
+      <div class="column">
+        <h2 class="title is-3">RoboStress Benchmark</h2>
+        <div class="content has-text-justified">
+          <p>
+            Evaluating robustness to execution errors ideally requires a fleet of robots with diverse mechanical states and operating conditions, which is impractical and risks hardware damage.
+            RoboStress reproduces these conditions in simulation with established joint-level models of
+            <b>Stribeck friction</b>, <b>gravity-compensation error</b>, <b>backlash</b>, and <b>dynamic compliance</b>.
+            Each noise term is injected at the stage of the control pipeline where it physically arises, so the resulting errors depend on the robot's state and motion history and propagate through the arm's dynamics.
+          </p>
+        </div>
+        <img src="./static/images/noise_injection.png" alt="Joint-level noise injection in RoboStress" style="width: 85%;">
+        <p class="figure-caption">
+          The operational space controller converts end-effector commands into joint torques.
+          Torque-level noise (friction, gravity-compensation error) is added to joint torques, and position-level noise (backlash, compliance) to joint positions before physics integration.
+        </p>
+
+        <h3 class="title is-5" style="margin-top: 2rem;">Seven deployment scenarios</h3>
+        <div class="result-table">
+          <table class="table is-narrow is-hoverable">
+            <thead>
+              <tr>
+                <th>Scenario</th><th>Physical cause</th>
+                <th>Fric.</th><th>Grav.</th><th>Back.</th><th>Comp.</th>
+                <th>Severity over episode</th><th>Joints</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>Heavy Payload</td><td>grasped load</td><td></td><td class="check">&#10003;</td><td></td><td class="check">&#10003;</td><td>While grasping</td><td>all</td></tr>
+              <tr><td>Thermal Drift-Stribeck</td><td>temperature change</td><td class="check">&#10003;</td><td></td><td></td><td></td><td>Linearly increasing</td><td>all</td></tr>
+              <tr><td>Thermal Drift-Backlash</td><td>temperature change</td><td></td><td></td><td class="check">&#10003;</td><td></td><td>Linearly increasing</td><td>all</td></tr>
+              <tr><td>Aged Transmission</td><td>gear wear</td><td class="check">&#10003;</td><td></td><td class="check">&#10003;</td><td></td><td>Fixed</td><td>all</td></tr>
+              <tr><td>Aged Joint-Uniform</td><td>gear + bearing wear</td><td class="check">&#10003;</td><td></td><td class="check">&#10003;</td><td class="check">&#10003;</td><td>Fixed</td><td>all</td></tr>
+              <tr><td>Aged Joint-Shoulder</td><td>gear + bearing wear</td><td class="check">&#10003;</td><td></td><td class="check">&#10003;</td><td class="check">&#10003;</td><td>Fixed</td><td>J1&ndash;J3</td></tr>
+              <tr><td>Aged Joint-Elbow</td><td>gear + bearing wear</td><td class="check">&#10003;</td><td></td><td class="check">&#10003;</td><td class="check">&#10003;</td><td>Fixed</td><td>J4</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 class="title is-5" style="margin-top: 2rem;">Closer to real execution errors than Gaussian action noise</h3>
+        <img src="./static/images/payload_fidelity.png" alt="Real payload execution deviations compared with RoboStress and Gaussian action noise" style="width: 90%;">
+        <p class="figure-caption">
+          We replay a pick-and-place demonstration on a Piper arm carrying a 1&nbsp;kg bowl and fit the Heavy Payload parameters to the resulting end-effector deviations.
+          RoboStress captures the post-grasp rise in deviation and is far closer to the real profile (DTW 0.027) than the Gaussian action noise used in prior robustness evaluations (DTW 0.388).
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- Simulation results -->
+<section class="section">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered has-text-centered">
+      <div class="column">
+        <h2 class="title is-3">Results on RoboStress</h2>
+        <div class="content has-text-justified">
+          <p>
+            Success rates (%) averaged over the four LIBERO suites (40 tasks, 20 episodes per task).
+            Self-compensating VLA outperforms the base policy, action-space domain randomization (DR), and RobustVLA in all seven scenarios with both backbones, while the training-time methods yield inconsistent gains.
+          </p>
+        </div>
+        <div class="result-table">
+          <table class="table is-narrow is-hoverable">
+            <thead>
+              <tr>
+                <th rowspan="2">Scenario</th>
+                <th colspan="4">&pi;<sub>0.5</sub></th>
+                <th colspan="4">&pi;<sub>0</sub></th>
+              </tr>
+              <tr>
+                <th>Base</th><th>DR</th><th>RobustVLA</th><th class="ours">Ours</th>
+                <th>Base</th><th>DR</th><th>RobustVLA</th><th class="ours">Ours</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>Clean</td><td>97.0</td><td><b>97.1</b></td><td>96.6</td><td class="ours">95.8</td><td>91.1</td><td>90.5</td><td>92.0</td><td class="ours"><b>92.6</b></td></tr>
+              <tr><td>Heavy Payload</td><td>44.1</td><td>42.1</td><td>38.9</td><td class="ours"><b>56.8</b></td><td>42.3</td><td>32.0</td><td>30.9</td><td class="ours"><b>42.8</b></td></tr>
+              <tr><td>Thermal Drift-Stribeck</td><td>54.1</td><td>54.6</td><td>55.9</td><td class="ours"><b>60.5</b></td><td>46.1</td><td>46.3</td><td>46.0</td><td class="ours"><b>50.6</b></td></tr>
+              <tr><td>Thermal Drift-Backlash</td><td>83.4</td><td>84.5</td><td>83.1</td><td class="ours"><b>84.8</b></td><td>75.5</td><td>77.3</td><td>77.3</td><td class="ours"><b>78.8</b></td></tr>
+              <tr><td>Aged Transmission</td><td>33.2</td><td>39.7</td><td>40.2</td><td class="ours"><b>41.8</b></td><td>26.8</td><td>22.9</td><td>23.8</td><td class="ours"><b>28.9</b></td></tr>
+              <tr><td>Aged Joint-Uniform</td><td>29.5</td><td>36.0</td><td>33.8</td><td class="ours"><b>38.6</b></td><td>23.0</td><td>22.4</td><td>20.0</td><td class="ours"><b>24.0</b></td></tr>
+              <tr><td>Aged Joint-Shoulder</td><td>43.9</td><td>46.4</td><td>43.0</td><td class="ours"><b>51.2</b></td><td>34.5</td><td>32.9</td><td>31.5</td><td class="ours"><b>39.2</b></td></tr>
+              <tr><td>Aged Joint-Elbow</td><td>55.6</td><td>54.0</td><td>53.9</td><td class="ours"><b>62.3</b></td><td>43.9</td><td>44.5</td><td>42.2</td><td class="ours"><b>44.9</b></td></tr>
+              <tr class="avg"><td>Avg.</td><td>49.1</td><td>51.0</td><td>49.8</td><td class="ours">56.6</td><td>41.7</td><td>39.8</td><td>38.8</td><td class="ours">44.2</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="figure-caption" style="text-align: center;">Averages exclude Clean. Best result per backbone in bold.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- Real-world results -->
+<section class="section">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered has-text-centered">
+      <div class="column">
+        <h2 class="title is-3">Real-world Experiments</h2>
+        <div class="content has-text-justified">
+          <p>
+            We evaluate on two AgileX Piper arms with naturally occurring execution errors: a new arm (<b>Robot A</b>) and one used for a year (<b>Robot B</b>).
+            Even the new arm shows a mean normalized command-execution residual of 32.9% (35.0% on the older arm).
+            Tasks 1&ndash;3 pick up a gray bowl from different locations and place it on a plate; Task 4 opens a cabinet drawer (25 episodes per task).
+          </p>
+        </div>
+        <div class="result-table">
+          <table class="table is-narrow is-hoverable">
+            <thead>
+              <tr>
+                <th rowspan="2">Avg. success (%)</th>
+                <th colspan="3">&pi;<sub>0.5</sub></th>
+                <th colspan="3">&pi;<sub>0</sub></th>
+              </tr>
+              <tr>
+                <th>Base</th><th>RobustVLA</th><th class="ours">Ours</th>
+                <th>Base</th><th>RobustVLA</th><th class="ours">Ours</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>Robot A (new)</td><td>43</td><td>52</td><td class="ours"><b>76</b></td><td>40</td><td>47</td><td class="ours"><b>72</b></td></tr>
+              <tr><td>Robot B (1 year old)</td><td>43</td><td>50</td><td class="ours"><b>74</b></td><td>38</td><td>49</td><td class="ours"><b>71</b></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="figure-caption" style="text-align: center;">Ours outperforms both baselines on every task, with both backbones, on both arms. Per-task results are in the paper.</p>
+
+        <img src="./static/images/real_rollouts.jpg" alt="Real-world rollouts of self-compensating VLA and the base policy on Robot A and Robot B" style="width: 100%; margin-top: 1.5rem;">
+        <p class="figure-caption">
+          Rollouts of self-compensating VLA (Ours) and the base policy (Base) on Tasks 2 and 4, for Robot A and Robot B. Green and red borders mark success and failure.
+          The base policy fails to grasp the bowl in Task 2 and to open the drawer in Task 4.
+        </p>
+
+        <h3 class="title is-5" style="margin-top: 2rem;">Generalization to objects unseen during fine-tuning</h3>
+        <img src="./static/images/ood_objects.jpg" alt="Generalization to unseen object variants on Robot A" style="width: 100%;">
+        <p class="figure-caption">
+          Task 1 on Robot A with five bowl/plate variants absent from the fine-tuning demonstrations.
+          With &pi;<sub>0.5</sub>, self-compensating VLA reaches 64% success, compared with 16% for the base policy and 36% for RobustVLA.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- BibTeX -->
+<section class="section" id="BibTeX">
+  <div class="container is-max-desktop content">
+    <h2 class="title">BibTeX</h2>
+    <pre><code>@article{lee2026taming,
+  author  = {Lee, Sohyun and Baek, Yoonjae and Won, Jaesang and Kim, Jinnyeong and
+             Kang, Hyunwoo and Baek, Seung-Hwan and Laptev, Ivan and Kwak, Suha},
+  title   = {Taming {VLAs} under Robot Execution Errors: Self-Compensation and Stress Testing},
+  journal = {arXiv preprint arXiv:2609.37334},
+  year    = {2026},
+}</code></pre>
+  </div>
+</section>
+
+
+<footer class="footer">
+  <div class="container">
+    <div class="columns is-centered">
+      <div class="column is-8">
+        <div class="content">
+          <p>
+            This website is licensed under a <a rel="license"
+                                                href="http://creativecommons.org/licenses/by-sa/4.0/">Creative
+            Commons Attribution-ShareAlike 4.0 International License</a>.
+            The template is borrowed from <a href="https://nerfies.github.io/">Nerfies</a>.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
