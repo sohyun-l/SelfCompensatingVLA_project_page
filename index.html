@@ -1,531 +1,594 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="description"
-        content="Taming VLAs under Robot Execution Errors: Self-Compensation and Stress Testing">
-  <meta name="keywords" content="Vision-Language-Action, VLA, Robustness, Execution Errors, Test-time Adaptation, RoboStress">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Taming VLAs under Robot Execution Errors</title>
-
+  <meta name="description" content="Self-compensating VLA adapts a VLA policy online from the residual between commanded and executed motion. RoboStress stress-tests VLAs under realistic joint-level execution errors.">
   <meta property="og:title" content="Taming VLAs under Robot Execution Errors: Self-Compensation and Stress Testing">
   <meta property="og:description" content="Self-compensating VLA adapts a VLA policy online from the residual between commanded and executed motion. RoboStress stress-tests VLAs under realistic joint-level execution errors.">
   <meta property="og:image" content="https://sohyun-l.github.io/SelfCompensatingVLA_project_page/static/images/teaser.png">
   <meta name="twitter:card" content="summary_large_image">
-
-  <link href="https://fonts.googleapis.com/css?family=Google+Sans|Noto+Sans|Castoro"
-        rel="stylesheet">
-
-  <link rel="stylesheet" href="./static/css/bulma.min.css">
-  <link rel="stylesheet" href="./static/css/fontawesome.all.min.css">
-  <link rel="stylesheet"
-        href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
-  <link rel="stylesheet" href="./static/css/index.css">
   <link rel="icon" href="./static/images/favicon.svg">
 
-  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;1,300&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
   <script defer src="./static/js/fontawesome.all.min.js"></script>
-  <script src="./static/js/index.js"></script>
 
   <style>
     :root {
-      --ours: #e34948;
-      --base: #2a78d6;
-      --dr: #1baf7a;
-      --rvla: #eda100;
-      --ink: #1f2328;
-      --ink-2: #4a4f57;
-      --ink-3: #7a808a;
-      --line: #e3e5e8;
-      --tint: #f6f7f9;
+      color-scheme: dark;
+      --bg: #0a0a0a;
+      --text: #ececec;
+      --text-2: #b9b9b9;
+      --text-3: #8a8a8a;
+      --accent: #5ecbe0;
+      --accent-rgb: 94, 203, 224;
+      --lav: #b39cff;
+      --rose: #ff7a90;
+      --hair: rgba(var(--accent-rgb), 0.16);
+      --hair-strong: rgba(var(--accent-rgb), 0.4);
+      --panel: rgba(255, 255, 255, 0.025);
+      --ease: cubic-bezier(.2, .8, .2, 1);
+      --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
     }
-    body { color: var(--ink); }
-    .section { padding: 3.5rem 1.5rem; }
-    .section.is-tinted { background: var(--tint); }
-    .title.is-3 { margin-bottom: 1.25rem; }
-    .kicker { font-family: 'Google Sans', sans-serif; font-size: 0.8rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ours); font-weight: bold; margin-bottom: 0.35rem; }
-    .lead { font-size: 1.1rem; color: var(--ink-2); max-width: 46rem; margin: 0 auto 1.5rem; }
-    .figure-caption { font-size: 0.92rem; color: var(--ink-2); margin-top: 0.6rem; text-align: left; }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: 'Roboto', system-ui, sans-serif; font-weight: 300; font-size: 16px; line-height: 1.65; -webkit-font-smoothing: antialiased; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { color: #9be6f2; }
+    b, strong { font-weight: 500; color: #fff; }
+    .accent { color: var(--accent); }
+    .lav { color: var(--lav); }
+    .mono { font-family: var(--mono); }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
 
-    /* Hero video */
-    .hero-videos { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .hero-row-label { grid-column: 1 / -1; font-style: italic; color: var(--ink-2); font-size: 0.95rem; margin-top: 0.4rem; }
-    .vid { position: relative; border-radius: 10px; overflow: hidden; background: #000; line-height: 0; }
+    /* ---------- Hero ---------- */
+    .hero { position: relative; height: min(92vh, 860px); min-height: 560px; overflow: hidden; }
+    .hero-mosaic { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(2, 1fr); gap: 2px; }
+    .hero-mosaic video { width: 100%; height: 100%; object-fit: cover; filter: saturate(0.85) brightness(0.8); }
+    .hero-shade { position: absolute; inset: 0; background:
+      linear-gradient(180deg, rgba(10,10,10,0.35) 0%, rgba(10,10,10,0.25) 35%, rgba(10,10,10,0.85) 72%, var(--bg) 100%),
+      radial-gradient(ellipse at 30% 40%, transparent 30%, rgba(10,10,10,0.55) 100%); }
+    .hero-caption { position: absolute; left: 0; right: 0; bottom: 64px; }
+    .hero-title { font-weight: 100; font-size: clamp(56px, 11vw, 132px); line-height: 0.95; letter-spacing: -0.02em; color: var(--accent); margin: 0; }
+    .hero-sub { font-weight: 300; font-size: clamp(16px, 2.1vw, 24px); color: #e6e6e6; margin-top: 0.8rem; max-width: 46rem; }
+    .hero-cue { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); font-size: 11px; letter-spacing: 0.3em; text-transform: uppercase; color: var(--text-3); }
+
+    /* ---------- Meta ---------- */
+    .meta { text-align: center; padding: 3rem 0 1rem; }
+    .venue { display: inline-flex; padding: 6px 14px; border-radius: 999px; border: 1px solid rgba(var(--accent-rgb), 0.45); background: rgba(var(--accent-rgb), 0.06); color: var(--accent); font-size: 11.5px; letter-spacing: 0.18em; text-transform: uppercase; }
+    .authors { display: flex; flex-wrap: wrap; justify-content: center; gap: 1rem 1.6rem; max-width: 1060px; margin: 1.6rem auto 0.6rem; }
+    .author { display: flex; flex-direction: column; align-items: center; line-height: 1.3; }
+    .author .name { font-size: 16px; font-weight: 300; color: var(--accent); white-space: nowrap; }
+    .author span.name { color: #e6e6e6; }
+    .author .aff { font-size: 12.5px; color: var(--text-3); letter-spacing: 0.04em; }
+    .eq { color: var(--accent); font-size: 0.75em; vertical-align: super; margin-left: 1px; }
+    .meta-note { font-size: 12px; font-weight: 100; letter-spacing: 0.06em; color: var(--text-3); margin: 0.2rem 0 1.2rem; }
+    .actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+    .btn { display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 18px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.03); color: var(--text); font-size: 12.5px; letter-spacing: 0.06em; transition: all 200ms var(--ease); }
+    .btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(var(--accent-rgb), 0.08); transform: translateY(-1px); }
+
+    /* ---------- TL;DR ---------- */
+    .tldr { padding: 4.5rem 0 1rem; }
+    .goal { font-weight: 100; font-size: clamp(26px, 4vw, 44px); line-height: 1.18; letter-spacing: -0.01em; text-align: center; max-width: 980px; margin: 0 auto 2rem; }
+    .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+    .card { border: 1px solid var(--hair); border-radius: 14px; padding: 1.2rem 1.1rem 1.25rem; background: linear-gradient(180deg, rgba(var(--accent-rgb), 0.05), rgba(var(--accent-rgb), 0) 70%), rgba(0,0,0,0.3); transition: border-color 250ms var(--ease), transform 250ms var(--ease); }
+    .card:hover { border-color: var(--hair-strong); transform: translateY(-2px); }
+    .card .ic { display: inline-flex; width: 30px; height: 30px; border-radius: 8px; align-items: center; justify-content: center; background: rgba(var(--accent-rgb), 0.12); color: var(--accent); font-size: 13px; margin-bottom: 0.6rem; }
+    .card h3 { font-weight: 400; font-size: 16px; line-height: 1.3; margin: 0 0 0.35rem; color: #fff; }
+    .card p { font-size: 13.5px; color: var(--text-2); margin: 0; line-height: 1.5; }
+    .card .big { font-family: var(--mono); color: var(--accent); }
+
+    /* ---------- Sections ---------- */
+    .section { padding: 5.5rem 0 0; }
+    .sh { display: flex; align-items: baseline; gap: 1rem; margin-bottom: 1.6rem; }
+    .sh .idx { font-size: 12px; letter-spacing: 0.3em; color: var(--accent); }
+    .sh h2 { font-weight: 100; font-size: clamp(30px, 4.4vw, 46px); line-height: 1.1; letter-spacing: -0.01em; margin: 0; }
+    .sh .rule { flex: 1; height: 1px; align-self: center; background: linear-gradient(to right, var(--accent), rgba(var(--accent-rgb), 0.5) 30%, rgba(var(--accent-rgb), 0.12) 70%, transparent); transform-origin: left; transform: scaleX(0); transition: transform 900ms var(--ease); }
+    .is-visible .sh .rule, .no-js .sh .rule { transform: scaleX(1); }
+    .lede { color: var(--text-2); max-width: 52rem; margin: 0 0 1.8rem; }
+    .sub-h { font-weight: 300; font-size: 22px; margin: 3.2rem 0 0.4rem; color: #fff; }
+    .note { font-size: 12.5px; color: var(--text-3); margin-top: 0.7rem; }
+    .panel { border: 1px solid var(--hair); border-radius: 16px; background: var(--panel); padding: 1.25rem; }
+
+    .reveal { opacity: 0; transform: translateY(24px); transition: opacity 800ms var(--ease), transform 800ms var(--ease); }
+    .reveal.is-visible { opacity: 1; transform: none; }
+    @media (prefers-reduced-motion: reduce) {
+      .reveal { opacity: 1; transform: none; transition: none; }
+      .sh .rule { transform: scaleX(1); transition: none; }
+      .flow-anim { animation: none !important; }
+      html { scroll-behavior: auto; }
+    }
+
+    /* ---------- Video tiles ---------- */
+    .vid { position: relative; border-radius: 12px; overflow: hidden; background: #000; line-height: 0; border: 1px solid rgba(255,255,255,0.06); }
     .vid video { width: 100%; height: auto; display: block; }
-    .vid .tag { position: absolute; top: 10px; left: 10px; line-height: 1.2; font-family: 'Google Sans', sans-serif; font-weight: bold; font-size: 0.85rem; padding: 3px 10px; border-radius: 999px; color: #fff; background: rgba(40,44,52,0.78); }
-    .vid .tag.ours { background: var(--ours); }
-    .tagline { font-family: 'Google Sans', sans-serif; font-size: 1.35rem; text-align: center; max-width: 44rem; margin: 1.5rem auto 0; line-height: 1.4; }
-    .tagline b { color: var(--ours); }
+    .tag { position: absolute; top: 10px; left: 10px; line-height: 1.2; font-size: 10.5px; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase; padding: 4px 10px; border-radius: 999px; color: #eaeaea; background: rgba(10,10,10,0.72); border: 1px solid rgba(255,255,255,0.18); backdrop-filter: blur(6px); }
+    .tag.ours { color: var(--bg); background: var(--accent); border-color: var(--accent); }
+    .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .prompt { font-style: italic; color: var(--text-2); margin: 1.4rem 0 0.6rem; font-size: 15px; }
+    .prompt .meta-s { font-style: normal; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-3); margin-left: 0.5rem; }
 
-    /* Stats */
-    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-top: 2rem; }
-    .stat-card { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 1.1rem 0.75rem; text-align: center; }
-    .stat-card .num { font-family: 'Google Sans', sans-serif; font-size: 1.7rem; font-weight: bold; white-space: nowrap; line-height: 1.15; }
-    .stat-card .num .from { color: var(--ink-3); font-weight: normal; }
-    .stat-card .num .to { color: var(--ours); }
-    .stat-card .lbl { font-size: 0.85rem; color: var(--ink-2); margin-top: 0.35rem; line-height: 1.35; }
-    @media (max-width: 768px) { .publication-title.title.is-1 { font-size: 2rem; } .stats { grid-template-columns: 1fr 1fr; } .tagline { font-size: 1.15rem; } }
+    /* ---------- Pills / tabs ---------- */
+    .tabs { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 1rem; }
+    .tabs .lbl { font-size: 10.5px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--text-3); margin: 0 0.2rem 0 0.6rem; }
+    .tabs .lbl:first-child { margin-left: 0; }
+    .pill { font-family: inherit; font-size: 12.5px; font-weight: 400; letter-spacing: 0.03em; color: var(--text-2); background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.14); border-radius: 999px; padding: 5px 14px; cursor: pointer; transition: all 200ms var(--ease); display: inline-flex; align-items: center; gap: 7px; }
+    .pill:hover { color: var(--accent); border-color: var(--hair-strong); }
+    .pill.on { color: var(--accent); border-color: var(--accent); background: rgba(var(--accent-rgb), 0.1); }
+    .pill .ico { width: 18px; height: 18px; border-radius: 5px; background: #e9eef0; display: inline-flex; align-items: center; justify-content: center; }
+    .pill .ico img { max-height: 13px; max-width: 14px; }
+    .tabs.center { justify-content: center; }
 
-    /* Selectors */
-    .selector { display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; justify-content: center; align-items: center; margin: 0.5rem 0 1rem; }
-    .selector .grp { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; justify-content: center; }
-    .selector .grp-label { font-size: 0.8rem; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.08em; margin-right: 0.15rem; }
-    .chip { font-family: 'Google Sans', sans-serif; font-size: 0.9rem; border: 1px solid var(--line); background: #fff; color: var(--ink); border-radius: 999px; padding: 0.3rem 0.85rem; cursor: pointer; transition: background .15s, color .15s, border-color .15s; }
-    .chip:hover { border-color: var(--ink-3); }
-    .chip.is-active { background: var(--ink); border-color: var(--ink); color: #fff; }
-    .instr { text-align: center; font-style: italic; color: var(--ink-2); margin-bottom: 0.75rem; min-height: 1.5em; }
-    .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    .note { font-size: 0.85rem; color: var(--ink-3); text-align: center; margin-top: 0.5rem; }
+    /* ---------- Method ---------- */
+    .method-top { display: grid; grid-template-columns: 1fr 1.05fr; gap: 1.5rem; align-items: center; margin-bottom: 1.6rem; }
+    .illus { background: #f4f6f7; border-radius: 16px; padding: 1rem; line-height: 0; }
+    .illus img { width: 100%; }
+    .diagram { overflow-x: auto; }
+    .diagram svg { width: 100%; min-width: 660px; height: auto; display: block; }
+    .diagram text { font-family: 'Roboto', sans-serif; }
+    .flow-anim { stroke-dasharray: 7 6; animation: flow 1.2s linear infinite; }
+    @keyframes flow { to { stroke-dashoffset: -26; } }
+    .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 14px; }
+    .step { border-left: 1px solid var(--hair-strong); padding: 0.2rem 0 0.2rem 1rem; }
+    .step .k { font-family: var(--mono); font-size: 11px; color: var(--accent); letter-spacing: 0.1em; }
+    .step h4 { font-weight: 400; font-size: 16px; margin: 0.15rem 0 0.3rem; color: #fff; }
+    .step p { font-size: 14px; color: var(--text-2); margin: 0; }
+    .eqn { font-family: 'Roboto', serif; font-style: italic; color: #fff; white-space: nowrap; }
 
-    /* Sim gallery */
+    /* ---------- Leaderboard bars ---------- */
+    .boards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .board { border: 1px solid var(--hair); border-radius: 14px; padding: 1rem 1.1rem 0.9rem; background: rgba(0,0,0,0.3); }
+    .board-h { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.6rem; }
+    .board-h .t { font-size: 15px; font-weight: 400; color: #fff; }
+    .board-h .d { font-family: var(--mono); font-size: 12px; color: var(--accent); }
+    .row { display: grid; grid-template-columns: 96px 1fr 44px; gap: 10px; align-items: center; height: 24px; font-size: 13px; }
+    .row .n { color: var(--text-2); white-space: nowrap; }
+    .row .track { display: block; height: 8px; border-radius: 4px; background: rgba(255,255,255,0.05); overflow: hidden; }
+    .row .fill { display: block; height: 100%; border-radius: 4px; background: rgba(255,255,255,0.32); width: 0; transition: width 900ms var(--ease); }
+    .row .v { font-family: var(--mono); font-size: 12.5px; text-align: right; color: var(--text-2); }
+    .row.ours .n { color: var(--accent); font-weight: 500; }
+    .row.ours .fill { background: linear-gradient(90deg, rgba(var(--accent-rgb), 0.55), var(--accent)); }
+    .row.ours .v { color: var(--accent); font-weight: 500; }
+
+    /* ---------- OOD ---------- */
+    .ood { display: grid; grid-template-columns: 1.55fr 1fr; gap: 14px; align-items: stretch; }
+    .ood-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .ood-grid img { width: 100%; display: block; border-radius: 10px; }
+
+    /* ---------- RoboStress ---------- */
+    .noise-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+    .noise { border: 1px solid var(--hair); border-radius: 14px; padding: 1.1rem; background: rgba(0,0,0,0.3); }
+    .noise .ico { width: 44px; height: 44px; border-radius: 10px; background: #e9eef0; display: flex; align-items: center; justify-content: center; margin-bottom: 0.7rem; }
+    .noise .ico img { max-height: 30px; max-width: 34px; }
+    .noise h4 { font-weight: 400; font-size: 16px; margin: 0 0 0.2rem; color: #fff; }
+    .noise p { font-size: 13.5px; color: var(--text-2); margin: 0 0 0.6rem; line-height: 1.45; }
+    .lvl { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; }
+    .lvl.torque { color: var(--rose); border: 1px solid rgba(255,122,144,0.4); }
+    .lvl.position { color: var(--lav); border: 1px solid rgba(179,156,255,0.4); }
+    .pipe { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 1.2rem 0 0; font-size: 13px; }
+    .pipe .node { border: 1px solid rgba(255,255,255,0.14); border-radius: 8px; padding: 4px 10px; color: var(--text-2); }
+    .pipe .node.torque { border-color: rgba(255,122,144,0.45); color: var(--rose); }
+    .pipe .node.position { border-color: rgba(179,156,255,0.45); color: var(--lav); }
+    .pipe .arr { color: var(--text-3); }
     .sim-grid { display: grid; grid-template-columns: auto 1fr 1fr; gap: 10px; align-items: center; max-width: 620px; margin: 0 auto; }
-    .sim-grid .row-label { font-family: 'Google Sans', sans-serif; font-weight: bold; font-size: 0.9rem; writing-mode: vertical-rl; transform: rotate(180deg); text-align: center; color: var(--ink-2); }
-    .sim-grid .row-label.stress { color: var(--ours); }
-    .scen-desc { max-width: 40rem; margin: 0 auto 1rem; text-align: center; color: var(--ink-2); min-height: 3em; }
-    .scen-desc b { color: var(--ink); }
+    .rlab { writing-mode: vertical-rl; transform: rotate(180deg); font-size: 10.5px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--text-3); text-align: center; }
+    .rlab.stress { color: var(--accent); }
+    .scen-desc { text-align: center; color: var(--text-2); min-height: 1.6em; margin: 0 0 1rem; }
 
-    /* Charts */
-    .chart-card { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 1rem 1rem 0.5rem; }
-    .chart-card h4 { font-family: 'Google Sans', sans-serif; font-size: 1rem; margin: 0 0 0.25rem; }
-    .chart-card .sub { font-size: 0.82rem; color: var(--ink-3); margin-bottom: 0.25rem; }
-    .legend { display: flex; flex-wrap: wrap; gap: 0.35rem 1rem; font-size: 0.85rem; color: var(--ink-2); margin: 0.25rem 0 0.25rem; }
-    .legend span { display: inline-flex; align-items: center; gap: 0.35rem; }
-    .legend i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
-    svg.chart { width: 100%; height: auto; display: block; overflow: visible; }
-    svg.chart text { font-family: 'Noto Sans', sans-serif; }
-    svg.chart .bar { transition: opacity .12s; }
-    svg.chart .bar:hover { opacity: 0.8; }
-    #tooltip { position: fixed; pointer-events: none; background: #1f2328; color: #fff; font-size: 0.82rem; padding: 6px 9px; border-radius: 6px; z-index: 50; opacity: 0; transition: opacity .1s; white-space: nowrap; }
+    /* ---------- Fidelity ---------- */
+    .fid { display: grid; grid-template-columns: 170px 1fr 1fr 1fr; gap: 16px; }
+    .fid-photos { display: grid; grid-template-rows: 1fr 1fr; gap: 8px; }
+    .fid-photos figure { position: relative; margin: 0; border-radius: 10px; overflow: hidden; line-height: 0; }
+    .fid-photos img { width: 100%; height: 100%; object-fit: cover; }
+    .fid-photos figcaption { position: absolute; left: 8px; bottom: 8px; line-height: 1.2; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; background: rgba(10,10,10,.75); color: #eee; padding: 3px 8px; border-radius: 999px; }
+    .fid-panel .t { font-size: 14px; font-weight: 400; color: #fff; }
+    .fid-panel .s { font-family: var(--mono); font-size: 11.5px; color: var(--text-3); }
+    .fid-panel svg { width: 100%; height: auto; display: block; margin-top: 6px; }
+    svg text { font-family: 'Roboto', sans-serif; }
 
-    /* Tables */
-    details.more { margin-top: 1rem; }
-    details.more summary { cursor: pointer; color: var(--ink-2); font-size: 0.92rem; text-align: center; }
-    .result-table { overflow-x: auto; margin: 0.75rem 0 0.25rem; }
-    .result-table table { margin: 0 auto; font-size: 0.88rem; }
-    .result-table th, .result-table td { text-align: center !important; vertical-align: middle !important; white-space: nowrap; }
-    .result-table td:first-child, .result-table th:first-child { text-align: left !important; }
-    .result-table .ours { background-color: #fdeeee; }
-    .result-table tr.avg td { border-top: 2px solid #dbdbdb; font-weight: bold; }
-    .check { color: var(--ours); }
+    /* ---------- Tables / details ---------- */
+    details.more { margin-top: 1.2rem; }
+    details.more summary { cursor: pointer; color: var(--text-3); font-size: 13px; letter-spacing: 0.06em; list-style: none; }
+    details.more summary::-webkit-details-marker { display: none; }
+    details.more summary::before { content: '+ '; color: var(--accent); }
+    details.more[open] summary::before { content: '\2212  '; }
+    .tbl { overflow-x: auto; margin-top: 0.8rem; }
+    table { border-collapse: collapse; margin: 0 auto; font-size: 13px; }
+    th, td { padding: 6px 10px; text-align: center; white-space: nowrap; border-bottom: 1px solid rgba(255,255,255,0.07); }
+    th { font-weight: 400; color: var(--text-3); font-size: 12px; }
+    td:first-child, th:first-child { text-align: left; }
+    td { font-family: var(--mono); font-size: 12.5px; color: var(--text-2); }
+    td:first-child { font-family: 'Roboto', sans-serif; font-size: 13px; }
+    td.o, th.o { color: var(--accent); }
+    td b { color: var(--accent); font-weight: 500; }
+    tr.avg td { border-top: 1px solid rgba(255,255,255,0.2); color: #fff; }
+    .ck { color: var(--accent); }
 
-    .step { display: flex; gap: 0.9rem; align-items: flex-start; margin-bottom: 1rem; text-align: left; }
-    .step .n { flex: 0 0 2rem; height: 2rem; border-radius: 50%; background: var(--ours); color: #fff; font-family: 'Google Sans', sans-serif; font-weight: bold; display: flex; align-items: center; justify-content: center; }
-    .step p { margin: 0; }
+    /* ---------- Abstract / cite ---------- */
+    .abstract { color: var(--text-2); font-size: 15.5px; text-align: justify; max-width: 58rem; }
+    .cite { position: relative; }
+    .cite pre { margin: 0; padding: 1.2rem 1.3rem; border: 1px solid var(--hair); border-radius: 12px; background: rgba(0,0,0,0.35); font-family: var(--mono); font-size: 12.5px; line-height: 1.6; color: var(--text-2); overflow-x: auto; }
+    .copy { position: absolute; top: 10px; right: 10px; }
+    footer { padding: 4rem 0 3rem; text-align: center; font-size: 12px; color: var(--text-3); }
+    footer a { color: var(--text-2); }
+
+    @media (max-width: 900px) {
+      .cards { grid-template-columns: 1fr 1fr; }
+      .method-top, .ood { grid-template-columns: 1fr; }
+      .steps { grid-template-columns: 1fr; }
+      .noise-grid { grid-template-columns: 1fr 1fr; }
+      .fid { grid-template-columns: 1fr 1fr; }
+      .fid-photos { grid-column: 1 / -1; grid-template-rows: none; grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 640px) {
+      .hero { height: 78vh; min-height: 480px; }
+      .hero-mosaic { grid-template-columns: repeat(2, 1fr); grid-template-rows: repeat(3, 1fr); }
+      .hero-caption { bottom: 48px; }
+      .boards { grid-template-columns: 1fr; }
+      .cards { grid-template-columns: 1fr; }
+      .authors { gap: 0.8rem 1.4rem; }
+      .section { padding-top: 4rem; }
+      .sh .rule { display: none; }
+      .abstract { text-align: left; }
+    }
   </style>
 </head>
-<body>
+<body class="no-js">
 
-<nav class="navbar" role="navigation" aria-label="main navigation">
-  <div class="navbar-brand">
-    <a role="button" class="navbar-burger" aria-label="menu" aria-expanded="false">
-      <span aria-hidden="true"></span>
-      <span aria-hidden="true"></span>
-      <span aria-hidden="true"></span>
-    </a>
+<!-- =================== HERO =================== -->
+<header class="hero" id="top">
+  <div class="hero-mosaic" aria-hidden="true">
+    <video autoplay muted loop playsinline preload="auto" src="./static/videos/real/robotB_pi0_task2_ours.mp4"></video>
+    <video autoplay muted loop playsinline preload="auto" src="./static/videos/real/robotB_pi05_task4_ours.mp4"></video>
+    <video autoplay muted loop playsinline preload="auto" src="./static/videos/real/robotB_pi05_task1_ours.mp4"></video>
+    <video autoplay muted loop playsinline preload="auto" src="./static/videos/real/robotB_pi0_task3_ours.mp4"></video>
+    <video autoplay muted loop playsinline preload="auto" src="./static/videos/real/robotB_pi0_task4_ours.mp4"></video>
+    <video autoplay muted loop playsinline preload="auto" src="./static/videos/real/robotB_pi05_task3_ours.mp4"></video>
   </div>
-  <div class="navbar-menu">
-    <div class="navbar-start" style="flex-grow: 1; justify-content: center;">
-      <a class="navbar-item" href="https://sohyun-l.github.io">
-      <span class="icon">
-          <i class="fas fa-home"></i>
-      </span>
-      </a>
+  <div class="hero-shade" aria-hidden="true"></div>
+  <div class="hero-caption">
+    <div class="wrap">
+      <h1 class="hero-title">Taming VLAs</h1>
+      <div class="hero-sub">under Robot Execution Errors: Self-Compensation and Stress Testing</div>
     </div>
   </div>
-</nav>
+  <a class="hero-cue" href="#meta">Scroll <i class="fas fa-chevron-down"></i></a>
+</header>
 
-
-<section class="hero">
-  <div class="hero-body" style="padding-bottom: 1.5rem;">
-    <div class="container is-max-desktop">
-      <div class="columns is-centered">
-        <div class="column has-text-centered">
-          <h1 class="title is-1 publication-title">Taming VLAs under Robot Execution Errors: Self-Compensation and Stress Testing</h1>
-          <div class="is-size-5 publication-authors">
-            <span class="author-block">
-              <a href="https://sohyun-l.github.io">Sohyun Lee</a><sup>1*</sup>,</span>
-            <span class="author-block">
-              Yoonjae Baek<sup>1*</sup>,</span>
-            <span class="author-block">
-              Jaesang Won<sup>1</sup>,</span>
-            <span class="author-block">
-              Jinnyeong Kim<sup>1</sup>,</span>
-            <br>
-            <span class="author-block">
-              Hyunwoo Kang<sup>1</sup>,</span>
-            <span class="author-block">
-              Seung-Hwan Baek<sup>1</sup>,</span>
-            <span class="author-block">
-              Ivan Laptev<sup>2</sup>,</span>
-            <span class="author-block">
-              <a href="https://suhakwak.github.io/">Suha Kwak</a><sup>1</sup></span>
-          </div>
-
-          <div class="is-size-5 publication-authors">
-            <span class="author-block"><sup>1</sup>POSTECH,</span>
-            <span class="author-block"><sup>2</sup>MBZUAI</span>
-          </div>
-
-          <div class="is-size-6 publication-authors" style="color: #777;">
-            <span class="author-block"><sup>*</sup>Equal contribution</span>
-          </div>
-
-          <div class="column has-text-centered">
-            <div class="publication-links">
-              <span class="link-block">
-                <a href="https://arxiv.org/pdf/2609.37334"
-                   class="external-link button is-normal is-rounded is-dark">
-                  <span class="icon"><i class="fas fa-file-pdf"></i></span>
-                  <span>Paper</span>
-                </a>
-              </span>
-              <span class="link-block">
-                <a href="https://arxiv.org/abs/2609.37334"
-                   class="external-link button is-normal is-rounded is-dark">
-                  <span class="icon"><i class="ai ai-arxiv"></i></span>
-                  <span>arXiv</span>
-                </a>
-              </span>
-              <span class="link-block">
-                <a href="#real-robot"
-                   class="external-link button is-normal is-rounded is-dark">
-                  <span class="icon"><i class="fas fa-video"></i></span>
-                  <span>Videos</span>
-                </a>
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
+<!-- =================== META =================== -->
+<section id="meta" class="meta">
+  <div class="wrap">
+    <span class="venue">arXiv 2026</span>
+    <div class="authors">
+      <div class="author"><a class="name" href="https://sohyun-l.github.io/">Sohyun Lee<span class="eq">*</span></a><span class="aff">POSTECH</span></div>
+      <div class="author"><a class="name" href="https://whyjyj.github.io/">Yoonjae Baek<span class="eq">*</span></a><span class="aff">POSTECH</span></div>
+      <div class="author"><a class="name" href="https://scholar.google.com/citations?user=xjS9njsAAAAJ">Jaesang Won</a><span class="aff">POSTECH</span></div>
+      <div class="author"><a class="name" href="https://divisonofficer.github.io/">Jinnyeong Kim</a><span class="aff">POSTECH</span></div>
+      <div class="author"><span class="name">Hyunwoo Kang</span><span class="aff">POSTECH</span></div>
+      <div class="author"><a class="name" href="https://www.shbaek.com/seung-hwan">Seung-Hwan Baek</a><span class="aff">POSTECH</span></div>
+      <div class="author"><a class="name" href="https://www.di.ens.fr/~laptev/">Ivan Laptev</a><span class="aff">MBZUAI</span></div>
+      <div class="author"><a class="name" href="https://suhakwak.github.io/">Suha Kwak</a><span class="aff">POSTECH</span></div>
+    </div>
+    <p class="meta-note"><span class="eq">*</span> Equal contribution</p>
+    <div class="actions">
+      <a class="btn" href="https://arxiv.org/pdf/2609.37334"><i class="fas fa-file-pdf"></i><span>Paper</span></a>
+      <a class="btn" href="https://arxiv.org/abs/2609.37334"><i class="ai ai-arxiv"></i><span>arXiv</span></a>
+      <a class="btn" href="#videos"><i class="fas fa-play-circle"></i><span>Videos</span></a>
+      <a class="btn" href="#cite"><i class="fas fa-quote-right"></i><span>BibTeX</span></a>
     </div>
   </div>
 </section>
 
+<!-- =================== TL;DR =================== -->
+<section class="tldr reveal">
+  <div class="wrap">
+    <p class="goal">Robots don&rsquo;t move exactly as commanded.<br>
+      Let the VLA <span class="accent">learn from that gap</span>, <span class="lav">while it runs</span>.</p>
+    <div class="cards">
+      <article class="card"><span class="ic"><i class="fas fa-sync-alt"></i></span><h3>Self-compensation at deployment.</h3><p>Online LoRA updates from the command&ndash;execution residual. No rewards, no labels.</p></article>
+      <article class="card"><span class="ic"><i class="fas fa-robot"></i></span><h3><span class="big">+30pp</span> on real robots.</h3><p>On a new and a 1-year-old Piper arm, for both &pi;<sub>0</sub> and &pi;<sub>0.5</sub>.</p></article>
+      <article class="card"><span class="ic"><i class="fas fa-cubes"></i></span><h3>Generalizes to unseen objects.</h3><p>16% &rarr; 64% success on bowls and plates absent from fine-tuning.</p></article>
+      <article class="card"><span class="ic"><i class="fas fa-flask"></i></span><h3>RoboStress benchmark.</h3><p>Four joint-level error models, seven deployment scenarios in simulation.</p></article>
+    </div>
+  </div>
+</section>
 
-<!-- Hero videos -->
-<section class="section is-tinted" style="padding-top: 2.5rem;">
-  <div class="container is-max-desktop">
-    <div class="hero-videos">
-      <div class="hero-row-label">&ldquo;Pick up the gray bowl on the plastic cabinet and place it on the plate&rdquo; &middot; Robot B &middot; &pi;<sub>0</sub></div>
-      <div class="vid"><video autoplay muted loop playsinline preload="auto" src="./static/videos/real/robotB_pi0_task2_base.mp4"></video><span class="tag">Base &pi;<sub>0</sub></span></div>
+<!-- =================== 01 ABSTRACT =================== -->
+<section class="section reveal">
+  <div class="wrap">
+    <div class="sh"><span class="idx">01</span><h2>Abstract</h2><span class="rule"></span></div>
+    <p class="abstract">
+      Vision-language-action (VLA) policies often fail when a robot's executed motion deviates from their commanded action. Such execution errors arise from the robot's mechanics and operating conditions, such as wear and payload changes. We propose <b>self-compensating VLA</b>, a deployment-time adaptation method that enables a VLA policy to pre-compensate for the robot's execution errors when generating commands. Without task rewards or labels, it updates the policy online using the residual between the action commanded by a VLA and the motion executed by the robot. To stress-test VLA robustness across execution conditions that are impractical to cover with physical robots alone, we introduce <b>RoboStress</b>, a controlled simulation benchmark. It combines established joint-level models of friction, backlash, compliance, and gravity-compensation error into seven deployment scenarios whose execution errors depend on the robot's state and motion history. On RoboStress, self-compensating VLA achieves higher average task success than both the base policies and methods that build in robustness during training. On two physical robot arms with different usage histories, it raises the average task success rate by more than 30 percentage points on each arm, and the gains extend to objects not seen in the task demonstrations.
+    </p>
+  </div>
+</section>
+
+<!-- =================== 02 BASE VS OURS =================== -->
+<section class="section reveal" id="videos">
+  <div class="wrap">
+    <div class="sh"><span class="idx">02</span><h2>Same robot, same VLA</h2><span class="rule"></span></div>
+    <p class="lede">A year-old Piper arm (Robot B). Left: the base policy. Right: the same policy with self-compensation.</p>
+    <p class="prompt">&ldquo;Pick up the gray bowl on the plastic cabinet and place it on the plate&rdquo;<span class="meta-s">&pi;<sub>0</sub></span></p>
+    <div class="pair">
+      <div class="vid"><video autoplay muted loop playsinline preload="auto" src="./static/videos/real/robotB_pi0_task2_base.mp4"></video><span class="tag">Base</span></div>
       <div class="vid"><video autoplay muted loop playsinline preload="auto" src="./static/videos/real/robotB_pi0_task2_ours.mp4"></video><span class="tag ours">Ours</span></div>
-      <div class="hero-row-label">&ldquo;Open the top drawer of the cabinet&rdquo; &middot; Robot B &middot; &pi;<sub>0.5</sub></div>
-      <div class="vid"><video autoplay muted loop playsinline preload="auto" src="./static/videos/real/robotB_pi05_task4_base.mp4"></video><span class="tag">Base &pi;<sub>0.5</sub></span></div>
+    </div>
+    <p class="prompt">&ldquo;Open the top drawer of the cabinet&rdquo;<span class="meta-s">&pi;<sub>0.5</sub></span></p>
+    <div class="pair">
+      <div class="vid"><video autoplay muted loop playsinline preload="auto" src="./static/videos/real/robotB_pi05_task4_base.mp4"></video><span class="tag">Base</span></div>
       <div class="vid"><video autoplay muted loop playsinline preload="auto" src="./static/videos/real/robotB_pi05_task4_ours.mp4"></video><span class="tag ours">Ours</span></div>
     </div>
-    <p class="tagline">
-      Robots don&rsquo;t move exactly as commanded. <b>Self-compensating VLA</b> learns from that gap while it runs,
-      with no rewards, no labels, and no change to the robot&rsquo;s controller.
-    </p>
+  </div>
+</section>
 
-    <div class="stats">
-      <div class="stat-card"><div class="num"><span class="from">43</span> &rarr; <span class="to">76</span></div><div class="lbl">Robot A success (%), &pi;<sub>0.5</sub></div></div>
-      <div class="stat-card"><div class="num"><span class="from">43</span> &rarr; <span class="to">74</span></div><div class="lbl">Robot B, used 1 year: success (%), &pi;<sub>0.5</sub></div></div>
-      <div class="stat-card"><div class="num"><span class="from">16</span> &rarr; <span class="to">64</span></div><div class="lbl">Unseen objects: success (%), &pi;<sub>0.5</sub></div></div>
-      <div class="stat-card"><div class="num"><span class="from">49.1</span> &rarr; <span class="to">56.6</span></div><div class="lbl">RoboStress, 7 scenarios: success (%), &pi;<sub>0.5</sub></div></div>
+<!-- =================== 03 METHOD =================== -->
+<section class="section reveal">
+  <div class="wrap">
+    <div class="sh"><span class="idx">03</span><h2>Learning from the gap</h2><span class="rule"></span></div>
+    <div class="method-top">
+      <div class="illus"><img src="./static/images/overview_selfcomp.png" alt="The executed motion misses the commanded target; after an online update, the compensated command lands on target."></div>
+      <div>
+        <p class="lede" style="margin-bottom: 1rem;">Wear, payload, and heat make the executed motion drift from the command. That drift is visible through <b>proprioception alone</b>, so it can serve as a free training signal during deployment.</p>
+        <p class="lede" style="margin: 0;">The pretrained VLA stays frozen. Only small <span class="accent">LoRA adapters</span> on the action expert are updated, and the robot&rsquo;s low-level controller is left untouched.</p>
+      </div>
+    </div>
+
+    <div class="panel diagram">
+      <svg viewBox="0 0 960 330" role="img" aria-label="Self-compensating VLA loop: the VLA issues an action chunk, the robot executes it, the residual between executed and commanded motion forms a compensated target, and a flow-matching loss updates the LoRA adapters.">
+        <defs>
+          <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8a8a8a"/></marker>
+          <marker id="aha" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5ecbe0"/></marker>
+        </defs>
+        <g fill="rgba(255,255,255,0.03)" stroke="rgba(255,255,255,0.14)">
+          <rect x="20" y="40" width="170" height="110" rx="14"/>
+          <rect x="250" y="25" width="250" height="140" rx="14"/>
+          <rect x="690" y="40" width="250" height="110" rx="14"/>
+          <rect x="690" y="210" width="250" height="90" rx="14"/>
+          <rect x="350" y="210" width="250" height="90" rx="14"/>
+        </g>
+        <text x="105" y="70" text-anchor="middle" font-size="15" fill="#fff">Observation</text>
+        <text x="105" y="95" text-anchor="middle" font-size="12.5" fill="#b9b9b9">camera images</text>
+        <text x="105" y="114" text-anchor="middle" font-size="12.5" fill="#b9b9b9">proprioception</text>
+        <text x="105" y="133" text-anchor="middle" font-size="12.5" fill="#b9b9b9">instruction</text>
+
+        <text x="375" y="52" text-anchor="middle" font-size="15" fill="#fff">VLA  &#960;&#8320; / &#960;&#8320;.&#8325;</text>
+        <rect x="268" y="66" width="104" height="80" rx="10" fill="rgba(255,255,255,0.05)"/>
+        <text x="320" y="98" text-anchor="middle" font-size="12.5" fill="#ececec">VLM +</text>
+        <text x="320" y="116" text-anchor="middle" font-size="12.5" fill="#ececec">action expert</text>
+        <text x="320" y="135" text-anchor="middle" font-size="10.5" fill="#8a8a8a" letter-spacing="1.5">FROZEN</text>
+        <rect x="384" y="66" width="98" height="80" rx="10" fill="rgba(94,203,224,0.12)" stroke="#5ecbe0" stroke-width="1.2"/>
+        <text x="433" y="102" text-anchor="middle" font-size="15" font-weight="500" fill="#5ecbe0">LoRA</text>
+        <text x="433" y="122" text-anchor="middle" font-size="10.5" fill="#5ecbe0" letter-spacing="1.5">TRAINABLE</text>
+
+        <text x="815" y="72" text-anchor="middle" font-size="15" fill="#fff">Robot executes</text>
+        <text x="815" y="97" text-anchor="middle" font-size="12.5" fill="#b9b9b9">unchanged low-level controller</text>
+        <text x="815" y="124" text-anchor="middle" font-size="12.5" fill="#ff7a90">wear &#183; payload &#183; heat &#8594; error</text>
+
+        <line x1="190" y1="95" x2="246" y2="95" stroke="#8a8a8a" stroke-width="1.5" marker-end="url(#ah)"/>
+        <line x1="500" y1="95" x2="686" y2="95" stroke="#8a8a8a" stroke-width="1.5" marker-end="url(#ah)"/>
+        <text x="593" y="84" text-anchor="middle" font-size="13" fill="#ececec" font-style="italic">command a<tspan font-size="9.5" dy="-6">policy</tspan></text>
+        <line x1="815" y1="150" x2="815" y2="206" stroke="#8a8a8a" stroke-width="1.5" marker-end="url(#ah)"/>
+        <text x="825" y="183" font-size="12" fill="#b9b9b9" font-style="italic">executed &#916;x</text>
+
+        <text x="706" y="236" font-size="11" fill="#5ecbe0" font-family="JetBrains Mono, monospace">01</text>
+        <text x="815" y="240" text-anchor="middle" font-size="14" fill="#fff">Residual</text>
+        <text x="815" y="272" text-anchor="middle" font-size="16" fill="#fff" font-style="italic">&#951;<tspan font-size="10" dy="-6">obs</tspan><tspan dy="6"> = &#916;x &#8722; a</tspan><tspan font-size="10" dy="-6">policy</tspan></text>
+        <line x1="690" y1="255" x2="604" y2="255" stroke="#8a8a8a" stroke-width="1.5" marker-end="url(#ah)"/>
+
+        <text x="366" y="236" font-size="11" fill="#5ecbe0" font-family="JetBrains Mono, monospace">02</text>
+        <text x="475" y="240" text-anchor="middle" font-size="14" fill="#fff">Compensated target</text>
+        <text x="475" y="272" text-anchor="middle" font-size="16" fill="#fff" font-style="italic">a<tspan font-size="10" dy="-6">target</tspan><tspan dy="6"> = a</tspan><tspan font-size="10" dy="-6">policy</tspan><tspan dy="6"> &#8722; &#951;</tspan><tspan font-size="10" dy="-6">obs</tspan></text>
+        <line x1="350" y1="255" x2="274" y2="255" stroke="#8a8a8a" stroke-width="1.5" marker-end="url(#ah)"/>
+
+        <rect x="60" y="210" width="210" height="90" rx="14" fill="rgba(94,203,224,0.08)" stroke="#5ecbe0" stroke-width="1.2"/>
+        <text x="76" y="236" font-size="11" fill="#5ecbe0" font-family="JetBrains Mono, monospace">03</text>
+        <text x="165" y="240" text-anchor="middle" font-size="14" fill="#5ecbe0">Online update</text>
+        <text x="165" y="266" text-anchor="middle" font-size="12.5" fill="#ececec">flow-matching loss</text>
+        <text x="165" y="284" text-anchor="middle" font-size="12.5" fill="#ececec">+ anchor to init</text>
+
+        <path d="M165,210 V185 H433 V150" fill="none" stroke="#5ecbe0" stroke-width="2" class="flow-anim" marker-end="url(#aha)"/>
+        <text x="300" y="178" text-anchor="middle" font-size="11" fill="#5ecbe0" letter-spacing="1.5">UPDATES LoRA ONLY</text>
+      </svg>
+    </div>
+
+    <div class="steps">
+      <div class="step"><span class="k">01 MEASURE</span><h4>Residual from proprioception</h4><p>After each executed step, compare the achieved motion with the command. No reward, label, or error model is needed.</p></div>
+      <div class="step"><span class="k">02 COMPENSATE</span><h4>A corrected target</h4><p>Subtracting the residual from the command gives the command that would have produced the intended motion.</p></div>
+      <div class="step"><span class="k">03 ADAPT</span><h4>Online LoRA update</h4><p>Rank-4 LoRA is trained toward that target during deployment, so later chunks pre-compensate.</p></div>
     </div>
   </div>
 </section>
 
+<!-- =================== 04 REAL ROBOTS =================== -->
+<section class="section reveal" id="real-robot">
+  <div class="wrap">
+    <div class="sh"><span class="idx">04</span><h2>Two real arms, four tasks</h2><span class="rule"></span></div>
+    <p class="lede">A new AgileX Piper arm (<b>Robot A</b>) and one used for a year (<b>Robot B</b>). Both show real command&ndash;execution mismatch (mean normalized residual <span class="mono">32.9%</span> and <span class="mono">35.0%</span>).</p>
 
-<!-- Abstract -->
-<section class="section">
-  <div class="container is-max-desktop">
-    <div class="columns is-centered has-text-centered">
-      <div class="column is-four-fifths">
-        <h2 class="title is-3">Abstract</h2>
-        <div class="content has-text-justified">
-          <p>
-            Vision-language-action (VLA) policies often fail when a robot's executed motion deviates from their commanded action. Such execution errors arise from the robot's mechanics and operating conditions, such as wear and payload changes. We propose self-compensating VLA, a deployment-time adaptation method that enables a VLA policy to pre-compensate for the robot's execution errors when generating commands. Without task rewards or labels, it updates the policy online using the residual between the action commanded by a VLA and the motion executed by the robot. To stress-test VLA robustness across execution conditions that are impractical to cover with physical robots alone, we introduce RoboStress, a controlled simulation benchmark. It combines established joint-level models of friction, backlash, compliance, and gravity-compensation error into seven deployment scenarios whose execution errors depend on the robot's state and motion history. On RoboStress, self-compensating VLA achieves higher average task success than both the base policies and methods that build in robustness during training. On two physical robot arms with different usage histories, it raises the average task success rate by more than 30 percentage points on each arm, and the gains extend to objects not seen in the task demonstrations.
-          </p>
-        </div>
-      </div>
+    <div class="tabs" id="real-tabs">
+      <span class="lbl">Robot</span>
+      <button class="pill" data-k="robot" data-v="B">B &middot; 1 year old</button>
+      <button class="pill" data-k="robot" data-v="A">A &middot; new</button>
+      <span class="lbl">Backbone</span>
+      <button class="pill" data-k="pol" data-v="pi0">&pi;<sub>0</sub></button>
+      <button class="pill" data-k="pol" data-v="pi05">&pi;<sub>0.5</sub></button>
+      <span class="lbl">Task</span>
+      <button class="pill" data-k="task" data-v="1">1</button>
+      <button class="pill" data-k="task" data-v="2">2</button>
+      <button class="pill" data-k="task" data-v="3">3</button>
+      <button class="pill" data-k="task" data-v="4">4</button>
     </div>
-  </div>
-</section>
-
-
-<!-- Overview -->
-<section class="section is-tinted">
-  <div class="container is-max-desktop">
-    <div class="has-text-centered">
-      <div class="kicker">Overview</div>
-      <h2 class="title is-3">Two contributions</h2>
-    </div>
-    <img src="./static/images/teaser.png" alt="Overview: (a) self-compensating VLA updates the policy online from command-execution residuals; (b) RoboStress combines joint-level noise models into deployment scenarios." style="width: 100%; border-radius: 10px; background: #fff;">
-    <p class="figure-caption">
-      <b>(a) Self-compensating VLA</b> updates the policy online using command-execution residuals and generates subsequent commands that pre-compensate for execution errors.
-      <b>(b) RoboStress</b> combines four established joint-level models into controlled deployment scenarios in simulation to stress-test VLA robustness.
-    </p>
-  </div>
-</section>
-
-
-<!-- Method -->
-<section class="section">
-  <div class="container is-max-desktop">
-    <div class="has-text-centered">
-      <div class="kicker">Method</div>
-      <h2 class="title is-3">Self-compensating VLA</h2>
-    </div>
-    <img src="./static/images/method.png" alt="Method overview of self-compensating VLA" style="width: 100%;">
-    <p class="figure-caption">
-      A frozen VLA with trainable LoRA adapters predicts an action chunk, which the robot executes.
-      The residual &eta;<sup>obs</sup> between the commanded and executed motion forms a pseudo-target, which the compensation objective uses to update only the LoRA adapters online during deployment.
-    </p>
-    <div class="columns is-centered" style="margin-top: 1.5rem;">
-      <div class="column is-10">
-        <div class="step"><div class="n">1</div><p><b>Measure the residual.</b> After each executed step, proprioception tells us how far the executed end-effector motion &Delta;x deviated from the command: &eta;<sup>obs</sup> = &Delta;x &minus; a<sup>policy</sup>. The residual needs only the issued commands and proprioception, so no task reward, label, or model of the error source is required.</p></div>
-        <div class="step"><div class="n">2</div><p><b>Build a compensated target.</b> Subtract the residual from the command: a<sup>target</sup> = a<sup>policy</sup> &minus; &eta;<sup>obs</sup>. This is the command that would have produced the intended motion.</p></div>
-        <div class="step"><div class="n">3</div><p><b>Adapt online.</b> Update rank-4 LoRA adapters on the action expert of &pi;<sub>0</sub> / &pi;<sub>0.5</sub> with a flow-matching loss toward the target, plus an anchor term that limits drift. Later chunks then pre-compensate for the robot&rsquo;s errors, and the low-level controller is left untouched.</p></div>
-      </div>
-    </div>
-  </div>
-</section>
-
-
-<!-- Real robot -->
-<section class="section is-tinted" id="real-robot">
-  <div class="container is-max-desktop">
-    <div class="has-text-centered">
-      <div class="kicker">Real-world experiments</div>
-      <h2 class="title is-3">Two Piper arms, four tasks</h2>
-      <p class="lead">
-        A new AgileX Piper arm (<b>Robot A</b>) and one used for a year (<b>Robot B</b>). Both show real command-execution mismatch
-        (mean normalized residual 32.9% and 35.0%). Pick a robot, backbone, and task to compare the base policy with ours.
-      </p>
-    </div>
-
-    <div class="selector" id="real-selector">
-      <div class="grp"><span class="grp-label">Robot</span>
-        <button class="chip" data-k="robot" data-v="B">B (1 year old)</button>
-        <button class="chip" data-k="robot" data-v="A">A (new)</button>
-      </div>
-      <div class="grp"><span class="grp-label">Backbone</span>
-        <button class="chip" data-k="pol" data-v="pi0">&pi;<sub>0</sub></button>
-        <button class="chip" data-k="pol" data-v="pi05">&pi;<sub>0.5</sub></button>
-      </div>
-      <div class="grp"><span class="grp-label">Task</span>
-        <button class="chip" data-k="task" data-v="1">1</button>
-        <button class="chip" data-k="task" data-v="2">2</button>
-        <button class="chip" data-k="task" data-v="3">3</button>
-        <button class="chip" data-k="task" data-v="4">4</button>
-      </div>
-    </div>
-    <div class="instr" id="real-instr"></div>
+    <p class="prompt" id="real-instr" style="margin-top: 0.2rem;"></p>
     <div class="pair">
       <div class="vid"><video id="real-base" autoplay muted loop playsinline preload="auto"></video><span class="tag" id="real-base-tag">Base</span></div>
       <div class="vid"><video id="real-ours" autoplay muted loop playsinline preload="auto"></video><span class="tag ours">Ours</span></div>
     </div>
     <p class="note" id="real-note"></p>
 
-    <div class="chart-card" style="max-width: 680px; margin: 2rem auto 0;">
-      <h4>Average success over 4 tasks (%)</h4>
-      <div class="sub">25 episodes per task; label above each group = gain of Ours over Base</div>
-      <div class="legend">
-        <span><i style="background: var(--base)"></i>Base</span>
-        <span><i style="background: var(--rvla)"></i>RobustVLA</span>
-        <span><i style="background: var(--ours)"></i>Ours</span>
-      </div>
-      <svg class="chart" id="chart-real" role="img" aria-label="Real-world average success rates"></svg>
-    </div>
+    <h3 class="sub-h">Average success over 4 tasks</h3>
+    <p class="note" style="margin: 0 0 1rem;">25 episodes per task &middot; top-right: gain of Ours over Base</p>
+    <div class="boards" id="boards-real"></div>
 
     <details class="more">
       <summary>Per-task results</summary>
-      <div class="result-table">
-        <table class="table is-narrow is-hoverable">
+      <div class="tbl">
+        <table>
           <thead>
             <tr><th rowspan="3">Task</th><th colspan="6">Robot A</th><th colspan="6">Robot B</th></tr>
             <tr><th colspan="3">&pi;<sub>0.5</sub></th><th colspan="3">&pi;<sub>0</sub></th><th colspan="3">&pi;<sub>0.5</sub></th><th colspan="3">&pi;<sub>0</sub></th></tr>
-            <tr><th>Base</th><th>RVLA</th><th class="ours">Ours</th><th>Base</th><th>RVLA</th><th class="ours">Ours</th><th>Base</th><th>RVLA</th><th class="ours">Ours</th><th>Base</th><th>RVLA</th><th class="ours">Ours</th></tr>
+            <tr><th>Base</th><th>RVLA</th><th class="o">Ours</th><th>Base</th><th>RVLA</th><th class="o">Ours</th><th>Base</th><th>RVLA</th><th class="o">Ours</th><th>Base</th><th>RVLA</th><th class="o">Ours</th></tr>
           </thead>
           <tbody>
-            <tr><td>1</td><td>48</td><td>52</td><td class="ours"><b>84</b></td><td>44</td><td>52</td><td class="ours"><b>76</b></td><td>44</td><td>56</td><td class="ours"><b>80</b></td><td>36</td><td>56</td><td class="ours"><b>60</b></td></tr>
-            <tr><td>2</td><td>36</td><td>60</td><td class="ours"><b>76</b></td><td>40</td><td>28</td><td class="ours"><b>80</b></td><td>36</td><td>48</td><td class="ours"><b>72</b></td><td>32</td><td>52</td><td class="ours"><b>84</b></td></tr>
-            <tr><td>3</td><td>48</td><td>48</td><td class="ours"><b>76</b></td><td>44</td><td>68</td><td class="ours"><b>72</b></td><td>56</td><td>52</td><td class="ours"><b>84</b></td><td>52</td><td>44</td><td class="ours"><b>84</b></td></tr>
-            <tr><td>4</td><td>40</td><td>48</td><td class="ours"><b>68</b></td><td>32</td><td>40</td><td class="ours"><b>60</b></td><td>36</td><td>44</td><td class="ours"><b>60</b></td><td>32</td><td>44</td><td class="ours"><b>56</b></td></tr>
-            <tr class="avg"><td>Avg.</td><td>43</td><td>52</td><td class="ours">76</td><td>40</td><td>47</td><td class="ours">72</td><td>43</td><td>50</td><td class="ours">74</td><td>38</td><td>49</td><td class="ours">71</td></tr>
+            <tr><td>1</td><td>48</td><td>52</td><td><b>84</b></td><td>44</td><td>52</td><td><b>76</b></td><td>44</td><td>56</td><td><b>80</b></td><td>36</td><td>56</td><td><b>60</b></td></tr>
+            <tr><td>2</td><td>36</td><td>60</td><td><b>76</b></td><td>40</td><td>28</td><td><b>80</b></td><td>36</td><td>48</td><td><b>72</b></td><td>32</td><td>52</td><td><b>84</b></td></tr>
+            <tr><td>3</td><td>48</td><td>48</td><td><b>76</b></td><td>44</td><td>68</td><td><b>72</b></td><td>56</td><td>52</td><td><b>84</b></td><td>52</td><td>44</td><td><b>84</b></td></tr>
+            <tr><td>4</td><td>40</td><td>48</td><td><b>68</b></td><td>32</td><td>40</td><td><b>60</b></td><td>36</td><td>44</td><td><b>60</b></td><td>32</td><td>44</td><td><b>56</b></td></tr>
+            <tr class="avg"><td>Avg.</td><td>43</td><td>52</td><td><b>76</b></td><td>40</td><td>47</td><td><b>72</b></td><td>43</td><td>50</td><td><b>74</b></td><td>38</td><td>49</td><td><b>71</b></td></tr>
           </tbody>
         </table>
       </div>
       <p class="note">Tasks 1&ndash;3: pick up the gray bowl (next to the plate / on the plastic cabinet / on the gift box) and place it on the plate. Task 4: open the cabinet&rsquo;s top drawer. RVLA = RobustVLA.</p>
     </details>
-
-    <h3 class="title is-5 has-text-centered" style="margin-top: 2.5rem;">Generalization to objects unseen during fine-tuning</h3>
-    <img src="./static/images/ood_objects.jpg" alt="Rollouts with unseen bowl and plate variants on Robot A" style="width: 100%; border-radius: 10px;">
-    <p class="figure-caption">
-      Task 1 on Robot A with five bowl/plate variants absent from the teleoperation data (5 episodes each). Left: our rollouts with the gray bowl (ID) and the variants (OOD).
-    </p>
   </div>
 </section>
 
+<!-- =================== 05 UNSEEN OBJECTS =================== -->
+<section class="section reveal">
+  <div class="wrap">
+    <div class="sh"><span class="idx">05</span><h2>Unseen objects</h2><span class="rule"></span></div>
+    <p class="lede">Bowls and plates never seen in the fine-tuning demonstrations. Robot A, &pi;<sub>0.5</sub>, 5 variants &times; 5 episodes.</p>
+    <div class="ood">
+      <div class="ood-grid">
+        <img src="./static/images/ood_gray.jpg" alt="Seen gray bowl: start and end frames">
+        <img src="./static/images/ood_wooden.jpg" alt="Unseen wooden bowl: start and end frames">
+        <img src="./static/images/ood_plum.jpg" alt="Unseen plum-colored bowl: start and end frames">
+        <img src="./static/images/ood_lightblue.jpg" alt="Unseen light-blue bowl: start and end frames">
+      </div>
+      <div class="board" id="board-ood" style="display: flex; flex-direction: column; justify-content: center;"></div>
+    </div>
+  </div>
+</section>
 
-<!-- RoboStress -->
-<section class="section" id="robostress">
-  <div class="container is-max-desktop">
-    <div class="has-text-centered">
-      <div class="kicker">Benchmark</div>
-      <h2 class="title is-3">RoboStress: stress testing in simulation</h2>
-      <p class="lead">
-        A fleet of worn, hot, or heavily loaded robots is impractical to assemble, and extreme settings risk hardware damage.
-        RoboStress reproduces these conditions in simulation with joint-level models of <b>Stribeck friction</b>, <b>gravity-compensation error</b>,
-        <b>backlash</b>, and <b>compliance</b>, and combines them into seven deployment scenarios.
-      </p>
+<!-- =================== 06 ROBOSTRESS =================== -->
+<section class="section reveal" id="robostress">
+  <div class="wrap">
+    <div class="sh"><span class="idx">06</span><h2>RoboStress</h2><span class="rule"></span></div>
+    <p class="lede">A fleet of worn, hot, or heavily loaded robots is impractical to assemble. RoboStress simulates them with four joint-level error models, each injected where it physically arises.</p>
+    <div class="noise-grid">
+      <div class="noise"><div class="ico"><img src="./static/images/icon_friction.png" alt=""></div><h4>Friction</h4><p>Stribeck model: sticky at low speed.</p><span class="lvl torque">torque</span></div>
+      <div class="noise"><div class="ico"><img src="./static/images/icon_gravity.png" alt=""></div><h4>Gravity comp.</h4><p>Pose-dependent load error.</p><span class="lvl torque">torque</span></div>
+      <div class="noise"><div class="ico"><img src="./static/images/icon_backlash.png" alt=""></div><h4>Backlash</h4><p>Dead zone on direction reversal.</p><span class="lvl position">position</span></div>
+      <div class="noise"><div class="ico"><img src="./static/images/icon_compliance.png" alt=""></div><h4>Compliance</h4><p>Joints deflect under load.</p><span class="lvl position">position</span></div>
+    </div>
+    <div class="pipe" aria-label="Control pipeline">
+      <span class="node">EE command</span><span class="arr">&rarr;</span>
+      <span class="node">OSC</span><span class="arr">&rarr;</span>
+      <span class="node torque">torque + friction, gravity</span><span class="arr">&rarr;</span>
+      <span class="node position">position + backlash, compliance</span><span class="arr">&rarr;</span>
+      <span class="node">physics</span>
     </div>
 
-    <div class="selector" id="sim-selector"></div>
-    <div class="scen-desc" id="sim-desc"></div>
+    <h3 class="sub-h">Seven deployment scenarios</h3>
+    <p class="note" style="margin: 0 0 1rem;">Same LIBERO episode, clean (top) vs. under the scenario (bottom).</p>
+    <div class="tabs center" id="sim-tabs"></div>
+    <p class="scen-desc" id="sim-desc"></p>
     <div class="sim-grid">
-      <div class="row-label">Clean</div>
+      <div class="rlab">Clean</div>
       <div class="vid"><video id="sim-c1" autoplay muted loop playsinline preload="auto"></video></div>
       <div class="vid"><video id="sim-c2" autoplay muted loop playsinline preload="auto"></video></div>
-      <div class="row-label stress">RoboStress</div>
+      <div class="rlab stress">RoboStress</div>
       <div class="vid"><video id="sim-s1" autoplay muted loop playsinline preload="auto"></video></div>
       <div class="vid"><video id="sim-s2" autoplay muted loop playsinline preload="auto"></video></div>
     </div>
-    <p class="note">Each column shows the same LIBERO episode in clean execution (top) and under the selected RoboStress scenario (bottom).</p>
-
-    <div class="columns is-vcentered" style="margin-top: 2.5rem;">
-      <div class="column is-7">
-        <img src="./static/images/noise_injection.png" alt="Joint-level noise injection in RoboStress" style="width: 100%;">
-      </div>
-      <div class="column is-5">
-        <h3 class="title is-5">Injected where it physically arises</h3>
-        <p>
-          The operational space controller converts end-effector commands into joint torques.
-          Friction and gravity-compensation error are added to the <b>joint torques</b>; backlash and compliance to the <b>joint positions</b> before physics integration.
-          The resulting errors depend on the robot&rsquo;s state and motion history, and a perturbation at one joint propagates through the whole arm.
-        </p>
-      </div>
-    </div>
-
     <details class="more">
       <summary>Scenario definitions</summary>
-      <div class="result-table">
-        <table class="table is-narrow is-hoverable">
-          <thead>
-            <tr><th>Scenario</th><th>Physical cause</th><th>Fric.</th><th>Grav.</th><th>Back.</th><th>Comp.</th><th>Severity over episode</th><th>Joints</th></tr>
-          </thead>
+      <div class="tbl">
+        <table>
+          <thead><tr><th>Scenario</th><th>Physical cause</th><th>Fric.</th><th>Grav.</th><th>Back.</th><th>Comp.</th><th>Severity over episode</th><th>Joints</th></tr></thead>
           <tbody>
-            <tr><td>Heavy Payload</td><td>grasped load</td><td></td><td class="check">&#10003;</td><td></td><td class="check">&#10003;</td><td>While grasping</td><td>all</td></tr>
-            <tr><td>Thermal Drift-Stribeck</td><td>temperature change</td><td class="check">&#10003;</td><td></td><td></td><td></td><td>Linearly increasing</td><td>all</td></tr>
-            <tr><td>Thermal Drift-Backlash</td><td>temperature change</td><td></td><td></td><td class="check">&#10003;</td><td></td><td>Linearly increasing</td><td>all</td></tr>
-            <tr><td>Aged Transmission</td><td>gear wear</td><td class="check">&#10003;</td><td></td><td class="check">&#10003;</td><td></td><td>Fixed</td><td>all</td></tr>
-            <tr><td>Aged Joint-Uniform</td><td>gear + bearing wear</td><td class="check">&#10003;</td><td></td><td class="check">&#10003;</td><td class="check">&#10003;</td><td>Fixed</td><td>all</td></tr>
-            <tr><td>Aged Joint-Shoulder</td><td>gear + bearing wear</td><td class="check">&#10003;</td><td></td><td class="check">&#10003;</td><td class="check">&#10003;</td><td>Fixed</td><td>J1&ndash;J3</td></tr>
-            <tr><td>Aged Joint-Elbow</td><td>gear + bearing wear</td><td class="check">&#10003;</td><td></td><td class="check">&#10003;</td><td class="check">&#10003;</td><td>Fixed</td><td>J4</td></tr>
+            <tr><td>Heavy Payload</td><td>grasped load</td><td></td><td class="ck">&#10003;</td><td></td><td class="ck">&#10003;</td><td>while grasping</td><td>all</td></tr>
+            <tr><td>Thermal Drift-Stribeck</td><td>temperature</td><td class="ck">&#10003;</td><td></td><td></td><td></td><td>linearly increasing</td><td>all</td></tr>
+            <tr><td>Thermal Drift-Backlash</td><td>temperature</td><td></td><td></td><td class="ck">&#10003;</td><td></td><td>linearly increasing</td><td>all</td></tr>
+            <tr><td>Aged Transmission</td><td>gear wear</td><td class="ck">&#10003;</td><td></td><td class="ck">&#10003;</td><td></td><td>fixed</td><td>all</td></tr>
+            <tr><td>Aged Joint-Uniform</td><td>gear + bearing wear</td><td class="ck">&#10003;</td><td></td><td class="ck">&#10003;</td><td class="ck">&#10003;</td><td>fixed</td><td>all</td></tr>
+            <tr><td>Aged Joint-Shoulder</td><td>gear + bearing wear</td><td class="ck">&#10003;</td><td></td><td class="ck">&#10003;</td><td class="ck">&#10003;</td><td>fixed</td><td>J1&ndash;J3</td></tr>
+            <tr><td>Aged Joint-Elbow</td><td>gear + bearing wear</td><td class="ck">&#10003;</td><td></td><td class="ck">&#10003;</td><td class="ck">&#10003;</td><td>fixed</td><td>J4</td></tr>
           </tbody>
         </table>
       </div>
     </details>
 
-    <h3 class="title is-5 has-text-centered" style="margin-top: 2.5rem;">Closer to real execution errors than Gaussian action noise</h3>
-    <img src="./static/images/payload_fidelity.png" alt="Real payload execution deviations compared with RoboStress and Gaussian action noise" style="width: 100%;">
-    <p class="figure-caption">
-      We replay a pick-and-place demonstration on a Piper arm carrying a 1&nbsp;kg bowl and fit the Heavy Payload parameters to the resulting end-effector deviations.
-      RoboStress captures the post-grasp rise in deviation and is far closer to the real profile (DTW 0.027) than the Gaussian action noise used in prior robustness evaluations (DTW 0.388).
-    </p>
+    <h3 class="sub-h">Closer to real errors than Gaussian noise</h3>
+    <p class="note" style="margin: 0 0 1rem;">End-effector deviation replaying a pick-and-place with a 1&nbsp;kg bowl. Shared y-axis; shaded = before grasp; thin = repeats, thick = mean.</p>
+    <div class="panel">
+      <div class="fid">
+        <div class="fid-photos">
+          <figure><img src="./static/images/fid_real.jpg" alt="Real Piper arm holding a weighted bowl"><figcaption>Real</figcaption></figure>
+          <figure><img src="./static/images/fid_sim.jpg" alt="Simulated arm holding a bowl"><figcaption>Sim</figcaption></figure>
+        </div>
+        <div class="fid-panel"><div class="t">Real robot</div><div class="s">reference</div><svg id="fid-real" role="img" aria-label="Real end-effector deviation over time"></svg></div>
+        <div class="fid-panel"><div class="t accent">RoboStress</div><div class="s">DTW to real <span class="accent">0.027</span></div><svg id="fid-robostress" role="img" aria-label="RoboStress end-effector deviation over time"></svg></div>
+        <div class="fid-panel"><div class="t lav">Gaussian action noise</div><div class="s">DTW to real <span class="lav">0.388</span></div><svg id="fid-gaussian" role="img" aria-label="Gaussian-noise end-effector deviation over time"></svg></div>
+      </div>
+    </div>
   </div>
 </section>
 
-
-<!-- Sim results -->
-<section class="section is-tinted">
-  <div class="container is-max-desktop">
-    <div class="has-text-centered">
-      <div class="kicker">Results on RoboStress</div>
-      <h2 class="title is-3">Better than training-time robustness in all seven scenarios</h2>
-      <p class="lead">
-        Averaged over the four LIBERO suites (40 tasks, 20 episodes each). Domain randomization (DR) and RobustVLA build robustness in at training time
-        and give inconsistent gains; self-compensating VLA adapts at deployment and improves on both backbones.
-      </p>
-    </div>
-    <div class="chart-card" style="max-width: 680px; margin: 0 auto;">
-      <h4>Average success over 7 deployment scenarios (%)</h4>
-      <div class="legend">
-        <span><i style="background: var(--base)"></i>Base</span>
-        <span><i style="background: var(--dr)"></i>DR</span>
-        <span><i style="background: var(--rvla)"></i>RobustVLA</span>
-        <span><i style="background: var(--ours)"></i>Ours</span>
-      </div>
-      <svg class="chart" id="chart-sim" role="img" aria-label="RoboStress average success rates"></svg>
-    </div>
-
-    <details class="more">
-      <summary>Per-scenario results</summary>
-      <div class="result-table">
-        <table class="table is-narrow is-hoverable">
-          <thead>
-            <tr><th rowspan="2">Scenario</th><th colspan="4">&pi;<sub>0.5</sub></th><th colspan="4">&pi;<sub>0</sub></th></tr>
-            <tr><th>Base</th><th>DR</th><th>RobustVLA</th><th class="ours">Ours</th><th>Base</th><th>DR</th><th>RobustVLA</th><th class="ours">Ours</th></tr>
-          </thead>
-          <tbody>
-            <tr><td>Clean</td><td>97.0</td><td><b>97.1</b></td><td>96.6</td><td class="ours">95.8</td><td>91.1</td><td>90.5</td><td>92.0</td><td class="ours"><b>92.6</b></td></tr>
-            <tr><td>Heavy Payload</td><td>44.1</td><td>42.1</td><td>38.9</td><td class="ours"><b>56.8</b></td><td>42.3</td><td>32.0</td><td>30.9</td><td class="ours"><b>42.8</b></td></tr>
-            <tr><td>Thermal Drift-Stribeck</td><td>54.1</td><td>54.6</td><td>55.9</td><td class="ours"><b>60.5</b></td><td>46.1</td><td>46.3</td><td>46.0</td><td class="ours"><b>50.6</b></td></tr>
-            <tr><td>Thermal Drift-Backlash</td><td>83.4</td><td>84.5</td><td>83.1</td><td class="ours"><b>84.8</b></td><td>75.5</td><td>77.3</td><td>77.3</td><td class="ours"><b>78.8</b></td></tr>
-            <tr><td>Aged Transmission</td><td>33.2</td><td>39.7</td><td>40.2</td><td class="ours"><b>41.8</b></td><td>26.8</td><td>22.9</td><td>23.8</td><td class="ours"><b>28.9</b></td></tr>
-            <tr><td>Aged Joint-Uniform</td><td>29.5</td><td>36.0</td><td>33.8</td><td class="ours"><b>38.6</b></td><td>23.0</td><td>22.4</td><td>20.0</td><td class="ours"><b>24.0</b></td></tr>
-            <tr><td>Aged Joint-Shoulder</td><td>43.9</td><td>46.4</td><td>43.0</td><td class="ours"><b>51.2</b></td><td>34.5</td><td>32.9</td><td>31.5</td><td class="ours"><b>39.2</b></td></tr>
-            <tr><td>Aged Joint-Elbow</td><td>55.6</td><td>54.0</td><td>53.9</td><td class="ours"><b>62.3</b></td><td>43.9</td><td>44.5</td><td>42.2</td><td class="ours"><b>44.9</b></td></tr>
-            <tr class="avg"><td>Avg.</td><td>49.1</td><td>51.0</td><td>49.8</td><td class="ours">56.6</td><td>41.7</td><td>39.8</td><td>38.8</td><td class="ours">44.2</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p class="note">Averages exclude Clean. Best result per backbone in bold.</p>
-    </details>
+<!-- =================== 07 NUMBERS =================== -->
+<section class="section reveal">
+  <div class="wrap">
+    <div class="sh"><span class="idx">07</span><h2>Numbers on RoboStress</h2><span class="rule"></span></div>
+    <p class="lede">Success rate over the four LIBERO suites (40 tasks, 20 episodes each). Training-time robustness (DR, RobustVLA) gives inconsistent gains; self-compensation is best in <b>all seven</b> scenarios on both backbones.</p>
+    <div class="tabs" id="num-tabs"></div>
+    <div class="boards" id="boards-sim"></div>
   </div>
 </section>
 
-
-<!-- BibTeX -->
-<section class="section" id="BibTeX">
-  <div class="container is-max-desktop content">
-    <h2 class="title">BibTeX</h2>
-    <pre><code>@article{lee2026taming,
+<!-- =================== 08 CITATION =================== -->
+<section class="section reveal" id="cite">
+  <div class="wrap">
+    <div class="sh"><span class="idx">08</span><h2>Citation</h2><span class="rule"></span></div>
+    <div class="cite">
+      <pre id="bibtex">@article{lee2026taming,
   author  = {Lee, Sohyun and Baek, Yoonjae and Won, Jaesang and Kim, Jinnyeong and
              Kang, Hyunwoo and Baek, Seung-Hwan and Laptev, Ivan and Kwak, Suha},
   title   = {Taming {VLAs} under Robot Execution Errors: Self-Compensation and Stress Testing},
   journal = {arXiv preprint arXiv:2609.37334},
   year    = {2026},
-}</code></pre>
+}</pre>
+      <button class="pill copy" id="copy-bib"><i class="far fa-copy"></i> <span>Copy</span></button>
+    </div>
   </div>
 </section>
 
-
-<footer class="footer">
-  <div class="container">
-    <div class="columns is-centered">
-      <div class="column is-8">
-        <div class="content">
-          <p>
-            This website is licensed under a <a rel="license"
-                                                href="http://creativecommons.org/licenses/by-sa/4.0/">Creative
-            Commons Attribution-ShareAlike 4.0 International License</a>.
-            The template is borrowed from <a href="https://nerfies.github.io/">Nerfies</a>.
-          </p>
-        </div>
-      </div>
-    </div>
+<footer>
+  <div class="wrap">
+    Page design inspired by <a href="https://anttwo.github.io/surflo/">Surflo</a>.
+    Licensed under <a href="http://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>.
   </div>
 </footer>
 
-<div id="tooltip"></div>
-
 <script>
 (function () {
-  // ---------- Real-robot gallery ----------
-  var TASKS = {
-    1: 'Pick up the gray bowl next to the plate and place it on the plate',
-    2: 'Pick up the gray bowl on the plastic cabinet and place it on the plate',
-    3: 'Pick up the gray bowl on the gift box and place it on the plate',
-    4: 'Open the top drawer of the cabinet'
-  };
-  var POL = { pi0: 'π<sub>0</sub>', pi05: 'π<sub>0.5</sub>' };
-  var real = { robot: 'B', pol: 'pi0', task: '1' };
-  var rb = document.getElementById('real-base'), ro = document.getElementById('real-ours');
+  document.body.classList.remove('no-js');
 
-  function playPair(vids) {
+  // ---------- Scroll reveal ----------
+  var reveals = document.querySelectorAll('.reveal');
+  if ('IntersectionObserver' in window) {
+    var io = new IntersectionObserver(function (es) {
+      es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('is-visible'); fillBars(e.target); io.unobserve(e.target); } });
+    }, { threshold: 0.08 });
+    reveals.forEach(function (r) { io.observe(r); });
+  } else {
+    reveals.forEach(function (r) { r.classList.add('is-visible'); });
+  }
+
+  // ---------- Synced playback ----------
+  function playTogether(vids) {
     var ready = 0;
     vids.forEach(function (v) {
       v.pause();
@@ -536,118 +599,159 @@
       v.load();
     });
   }
+
+  // ---------- Real-robot gallery ----------
+  var TASKS = {
+    1: 'Pick up the gray bowl next to the plate and place it on the plate',
+    2: 'Pick up the gray bowl on the plastic cabinet and place it on the plate',
+    3: 'Pick up the gray bowl on the gift box and place it on the plate',
+    4: 'Open the top drawer of the cabinet'
+  };
+  var POL = { pi0: 'π<sub>0</sub>', pi05: 'π<sub>0.5</sub>' };
+  var real = { robot: 'B', pol: 'pi0', task: '1' };
+  var rb = document.getElementById('real-base'), ro = document.getElementById('real-ours');
   function renderReal() {
     var stem = './static/videos/real/robot' + real.robot + '_' + real.pol + '_task' + real.task + '_';
-    rb.src = stem + 'base.mp4';
-    ro.src = stem + 'ours.mp4';
-    playPair([rb, ro]);
-    document.getElementById('real-instr').textContent = '“' + TASKS[real.task] + '”';
-    document.getElementById('real-base-tag').innerHTML = 'Base ' + POL[real.pol];
-    document.getElementById('real-note').textContent = real.robot === 'A'
-      ? 'Robot A clips are low resolution.' : '';
-    document.querySelectorAll('#real-selector .chip').forEach(function (c) {
-      c.classList.toggle('is-active', real[c.dataset.k] === c.dataset.v);
-    });
+    rb.src = stem + 'base.mp4'; ro.src = stem + 'ours.mp4';
+    playTogether([rb, ro]);
+    document.getElementById('real-instr').innerHTML = '“' + TASKS[real.task] + '”<span class="meta-s">Robot ' + real.robot + ' · ' + POL[real.pol] + '</span>';
+    document.getElementById('real-base-tag').innerHTML = 'Base';
+    document.getElementById('real-note').textContent = real.robot === 'A' ? 'Robot A’s camera records at low resolution.' : '';
+    document.querySelectorAll('#real-tabs .pill').forEach(function (c) { c.classList.toggle('on', real[c.dataset.k] === c.dataset.v); });
   }
-  document.querySelectorAll('#real-selector .chip').forEach(function (c) {
+  document.querySelectorAll('#real-tabs .pill').forEach(function (c) {
     c.addEventListener('click', function () { real[c.dataset.k] = c.dataset.v; renderReal(); });
   });
   renderReal();
 
   // ---------- RoboStress gallery ----------
   var SCEN = [
-    ['heavy_payload', 'Heavy Payload', 'A grasped load adds <b>gravity-compensation error</b> and larger <b>joint deflections</b> while the gripper holds an object.'],
-    ['thermal_stribeck', 'Thermal Drift-Stribeck', '<b>Friction</b> grows linearly over the episode, as when a robot warms up.'],
-    ['thermal_backlash', 'Thermal Drift-Backlash', '<b>Backlash</b> grows linearly over the episode: a history-dependent position error that changes within the episode.'],
-    ['aged_transmission', 'Aged Transmission', 'Gear wear: worn teeth increase <b>backlash</b> and degraded lubrication raises <b>friction</b> on every joint.'],
-    ['aged_joint_uniform', 'Aged Joint-Uniform', 'Gear and bearing wear on all seven joints: <b>friction</b>, <b>backlash</b>, and <b>compliance</b> all increase.'],
-    ['aged_joint_shoulder', 'Aged Joint-Shoulder', 'The same wear as Aged Joint, applied only to the shoulder joints <b>J1&ndash;J3</b> near the base.'],
-    ['aged_joint_elbow', 'Aged Joint-Elbow', 'The same wear as Aged Joint, applied only to the elbow joint <b>J4</b>.']
+    ['heavy_payload', 'Heavy Payload', 'payload', 'Gravity-compensation error and joint deflection while holding an object.'],
+    ['thermal_stribeck', 'Thermal Drift-Stribeck', 'thermal', 'Friction rises steadily over the episode.'],
+    ['thermal_backlash', 'Thermal Drift-Backlash', 'thermal', 'Backlash widens steadily over the episode.'],
+    ['aged_transmission', 'Aged Transmission', 'aging', 'Gear wear: more friction and backlash on every joint.'],
+    ['aged_joint_uniform', 'Aged Joint-Uniform', 'aging', 'Gear and bearing wear on all seven joints.'],
+    ['aged_joint_shoulder', 'Aged Joint-Shoulder', 'aging', 'The same wear, only on the shoulder joints J1&ndash;J3.'],
+    ['aged_joint_elbow', 'Aged Joint-Elbow', 'aging', 'The same wear, only on the elbow joint J4.']
   ];
-  var simSel = document.getElementById('sim-selector');
+  var simTabs = document.getElementById('sim-tabs');
   var simVids = ['sim-c1', 'sim-c2', 'sim-s1', 'sim-s2'].map(function (id) { return document.getElementById(id); });
   var simFiles = ['ex1_clean', 'ex2_clean', 'ex1_stress', 'ex2_stress'];
   function renderSim(i) {
     var s = SCEN[i];
     simVids.forEach(function (v, k) { v.src = './static/videos/sim/' + s[0] + '_' + simFiles[k] + '.mp4'; });
-    playPair(simVids);
-    document.getElementById('sim-desc').innerHTML = '<b>' + s[1] + '.</b> ' + s[2];
-    simSel.querySelectorAll('.chip').forEach(function (c, k) { c.classList.toggle('is-active', k === i); });
+    playTogether(simVids);
+    document.getElementById('sim-desc').innerHTML = s[3];
+    simTabs.querySelectorAll('.pill').forEach(function (c, k) { c.classList.toggle('on', k === i); });
   }
   SCEN.forEach(function (s, i) {
     var b = document.createElement('button');
-    b.className = 'chip'; b.textContent = s[1];
+    b.className = 'pill';
+    b.innerHTML = '<span class="ico"><img src="./static/images/icon_' + s[2] + '.png" alt=""></span>' + s[1];
     b.addEventListener('click', function () { renderSim(i); });
-    simSel.appendChild(b);
+    simTabs.appendChild(b);
   });
   renderSim(0);
 
-  // ---------- Charts ----------
-  var tip = document.getElementById('tooltip');
-  function showTip(e, html) { tip.innerHTML = html; tip.style.left = (e.clientX + 12) + 'px'; tip.style.top = (e.clientY - 34) + 'px'; tip.style.opacity = 1; }
-  function hideTip() { tip.style.opacity = 0; }
+  // ---------- Leaderboard bars ----------
+  function board(title, rows, max, opts) {
+    opts = opts || {};
+    var d = rows[rows.length - 1][1] - rows[0][1];
+    var h = '<div class="board-h"><span class="t">' + title + '</span>' +
+            (opts.delta ? '<span class="d">+' + (Math.round(d * 10) / 10) + 'pp</span>' : '') + '</div>';
+    rows.forEach(function (r, i) {
+      var ours = i === rows.length - 1;
+      var v = opts.dec ? r[1].toFixed(1) : r[1];
+      h += '<div class="row' + (ours ? ' ours' : '') + '"><span class="n">' + r[0] + '</span>' +
+           '<span class="track"><span class="fill" data-w="' + (r[1] / max * 100) + '"></span></span>' +
+           '<span class="v">' + v + '</span></div>';
+    });
+    return '<div class="board">' + h + '</div>';
+  }
+  function fillBars(root) {
+    root.querySelectorAll('.fill').forEach(function (f) { f.style.width = f.dataset.w + '%'; });
+  }
+  var REAL = [
+    ['Robot A &middot; &pi;<sub>0.5</sub>', [43, 52, 76]],
+    ['Robot A &middot; &pi;<sub>0</sub>', [40, 47, 72]],
+    ['Robot B &middot; &pi;<sub>0.5</sub>', [43, 50, 74]],
+    ['Robot B &middot; &pi;<sub>0</sub>', [38, 49, 71]]
+  ];
+  document.getElementById('boards-real').innerHTML = REAL.map(function (g) {
+    return board(g[0], [['Base', g[1][0]], ['RobustVLA', g[1][1]], ['Ours', g[1][2]]], 100, { delta: true });
+  }).join('');
+  var ood = document.getElementById('board-ood');
+  ood.innerHTML = board('Success on unseen objects (%)', [['Base', 16], ['RobustVLA', 36], ['Ours', 64]], 100, { delta: true }).replace(/^<div class="board">|<\/div>$/g, '');
+
+  // RoboStress numbers: [pi05: Base, DR, RVLA, Ours], [pi0: ...]
+  var SIM = {
+    'Average': [[49.1, 51.0, 49.8, 56.6], [41.7, 39.8, 38.8, 44.2]],
+    'Heavy Payload': [[44.1, 42.1, 38.9, 56.8], [42.3, 32.0, 30.9, 42.8]],
+    'Thermal Drift-Stribeck': [[54.1, 54.6, 55.9, 60.5], [46.1, 46.3, 46.0, 50.6]],
+    'Thermal Drift-Backlash': [[83.4, 84.5, 83.1, 84.8], [75.5, 77.3, 77.3, 78.8]],
+    'Aged Transmission': [[33.2, 39.7, 40.2, 41.8], [26.8, 22.9, 23.8, 28.9]],
+    'Aged Joint-Uniform': [[29.5, 36.0, 33.8, 38.6], [23.0, 22.4, 20.0, 24.0]],
+    'Aged Joint-Shoulder': [[43.9, 46.4, 43.0, 51.2], [34.5, 32.9, 31.5, 39.2]],
+    'Aged Joint-Elbow': [[55.6, 54.0, 53.9, 62.3], [43.9, 44.5, 42.2, 44.9]],
+    'Clean': [[97.0, 97.1, 96.6, 95.8], [91.1, 90.5, 92.0, 92.6]]
+  };
+  var numTabs = document.getElementById('num-tabs'), simBoards = document.getElementById('boards-sim');
+  function renderNum(key) {
+    var names = ['Base', 'DR', 'RobustVLA', 'Ours'];
+    simBoards.innerHTML = [['&pi;<sub>0.5</sub>', SIM[key][0]], ['&pi;<sub>0</sub>', SIM[key][1]]].map(function (g) {
+      return board(g[0] + (key === 'Average' ? ' &middot; avg. of 7 scenarios' : ''), names.map(function (n, i) { return [n, g[1][i]]; }), 100, { dec: true, delta: key !== 'Clean' });
+    }).join('');
+    numTabs.querySelectorAll('.pill').forEach(function (p) { p.classList.toggle('on', p.dataset.k === key); });
+    requestAnimationFrame(function () { requestAnimationFrame(function () { fillBars(simBoards); }); });
+  }
+  Object.keys(SIM).forEach(function (k) {
+    var b = document.createElement('button'); b.className = 'pill'; b.dataset.k = k; b.textContent = k;
+    b.addEventListener('click', function () { renderNum(k); });
+    numTabs.appendChild(b);
+  });
+  renderNum('Average');
+
+  // ---------- Fidelity small multiples (shared y-axis) ----------
+  var FID = {"real":{"mean":[0.012,0.012,0.011,0.01,0.01,0.01,0.01,0.009,0.008,0.009,0.009,0.009,0.019,0.011,0.034,0.081,0.063,0.093,0.148,0.078,0.084,0.063,0.029,0.08,0.026,0.012,0.022,0.03,0.044,0.058,0.079,0.026,0.019,0.016,0.023,0.025,0.019,0.018,0.05,0.096,0.173,0.132,0.159,0.057,0.056,0.075,0.082,0.078,0.076,0.047,0.043,0.16,0.213,0.127,0.156,0.109,0.101,0.08,0.087,0.038,0.066,0.059,0.036,0.049,0.101,0.121,0.113,0.135,0.116,0.063,0.078,0.095,0.426,0.252,0.835,0.235,0.197,0.377,0.441,0.335,0.28,0.396,0.09,0.213,0.125,0.146,0.298,0.188,0.07,0.102,0.319,0.092,0.131,0.122,0.079,0.139,0.081,0.115,0.093,0.08],"rep":[[0.009,0.009,0.008,0.007,0.007,0.007,0.007,0.006,0.006,0.01,0.007,0.008,0.013,0.018,0.03,0.089,0.074,0.128,0.255,0.063,0.069,0.129,0.017,0.171,0.038,0.014,0.026,0.032,0.054,0.032,0.053,0.033,0.019,0.011,0.029,0.018,0.019,0.018,0.04,0.121,0.169,0.14,0.145,0.041,0.06,0.085,0.115,0.108,0.109,0.059,0.05,0.188,0.178,0.032,0.07,0.052,0.06,0.052,0.091,0.037,0.117,0.097,0.052,0.026,0.025,0.118,0.069,0.16,0.142,0.054,0.036,0.072,0.436,0.21,0.8,0.279,0.166,0.357,0.455,0.27,0.285,0.373,0.082,0.171,0.074,0.144,0.31,0.171,0.08,0.06,0.252,0.083,0.108,0.081,0.095,0.086,0.061,0.092,0.05,0.074],[0.015,0.015,0.014,0.014,0.014,0.014,0.013,0.012,0.013,0.009,0.014,0.013,0.019,0.009,0.033,0.107,0.063,0.092,0.042,0.057,0.06,0.021,0.022,0.048,0.018,0.017,0.017,0.035,0.042,0.034,0.101,0.024,0.021,0.029,0.03,0.033,0.022,0.024,0.044,0.097,0.203,0.19,0.217,0.04,0.043,0.025,0.023,0.018,0.013,0.014,0.017,0.164,0.13,0.046,0.08,0.044,0.068,0.068,0.112,0.033,0.044,0.021,0.007,0.023,0.03,0.045,0.161,0.157,0.128,0.055,0.088,0.09,0.436,0.309,0.867,0.268,0.203,0.381,0.478,0.395,0.291,0.438,0.101,0.197,0.13,0.164,0.304,0.179,0.082,0.174,0.299,0.106,0.132,0.118,0.034,0.142,0.091,0.108,0.129,0.109],[0.011,0.011,0.01,0.01,0.01,0.01,0.009,0.008,0.004,0.009,0.007,0.005,0.026,0.008,0.04,0.048,0.053,0.06,0.148,0.115,0.122,0.04,0.048,0.02,0.023,0.006,0.024,0.025,0.037,0.109,0.082,0.022,0.015,0.007,0.012,0.022,0.018,0.013,0.065,0.071,0.145,0.067,0.115,0.09,0.067,0.116,0.11,0.109,0.107,0.068,0.062,0.128,0.332,0.304,0.319,0.231,0.176,0.118,0.058,0.043,0.037,0.06,0.048,0.099,0.248,0.201,0.108,0.089,0.078,0.08,0.108,0.124,0.408,0.237,0.838,0.157,0.222,0.393,0.39,0.34,0.264,0.376,0.089,0.271,0.17,0.131,0.282,0.212,0.048,0.072,0.406,0.087,0.151,0.166,0.107,0.188,0.091,0.144,0.099,0.058]]},"robostress":{"mean":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.115,0.375,0.604,0.78,0.723,0.651,0.6,0.294,0.259,0.279,0.158,0.162,0.202,0.128,0.148,0.128,0.158,0.136,0.104,0.109,0.128,0.122,0.142,0.198,0.111,0.125,0.089,0.14,0.199,0.105,0.115,0.116,0.118,0.087,0.099,0.09,0.089,0.092,0.08],"rep":[[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.087,0.357,0.577,0.74,0.564,0.542,0.7,0.204,0.204,0.344,0.137,0.139,0.241,0.134,0.167,0.122,0.175,0.192,0.101,0.081,0.186,0.126,0.126,0.192,0.11,0.068,0.108,0.127,0.142,0.118,0.106,0.145,0.069,0.088,0.163,0.091,0.067,0.114,0.078],[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.04,0.323,0.549,0.802,0.948,0.825,0.585,0.536,0.305,0.26,0.242,0.122,0.182,0.147,0.067,0.137,0.107,0.056,0.122,0.086,0.08,0.129,0.189,0.57,0.155,0.229,0.029,0.095,0.024,0.028,0.053,0.124,0.045,0.035,0.048,0.05,0.047,0.037,0.042],[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.265,0.482,0.564,0.463,0.579,0.606,0.232,0.225,0.289,0.055,0.15,0.152,0.063,0.17,0.078,0.092,0.15,0.059,0.039,0.099,0.079,0.107,0.09,0.073,0.112,0.038,0.046,0.116,0.082,0.077,0.104,0.065,0.096,0.044,0.06,0.162,0.098,0.066],[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.279,0.51,0.768,1.0,1.0,1.0,0.406,0.301,0.552,0.072,0.269,0.301,0.192,0.248,0.155,0.092,0.286,0.14,0.138,0.259,0.073,0.123,0.194,0.112,0.181,0.167,0.075,0.365,0.731,0.144,0.287,0.051,0.148,0.06,0.074,0.085,0.076,0.049,0.041],[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.087,0.356,0.575,0.73,0.543,0.55,0.694,0.194,0.214,0.334,0.136,0.141,0.221,0.132,0.173,0.123,0.17,0.192,0.093,0.07,0.18,0.131,0.128,0.194,0.114,0.08,0.108,0.133,0.152,0.122,0.108,0.153,0.147,0.112,0.186,0.108,0.078,0.129,0.103],[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.04,0.325,0.546,0.764,0.734,0.485,0.677,0.44,0.074,0.435,0.212,0.123,0.289,0.102,0.144,0.258,0.178,0.078,0.167,0.18,0.156,0.175,0.174,0.123,0.081,0.138,0.202,0.14,0.122,0.18,0.136,0.132,0.228,0.132,0.066,0.169,0.136,0.147,0.17],[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.274,0.491,0.728,0.856,0.652,0.5,0.528,0.152,0.24,0.217,0.056,0.158,0.14,0.068,0.159,0.088,0.098,0.143,0.047,0.049,0.12,0.088,0.075,0.106,0.066,0.083,0.063,0.077,0.104,0.062,0.04,0.103,0.122,0.086,0.114,0.062,0.054,0.07,0.063]]},"gaussian":{"mean":[0.0,0.257,0.477,0.861,0.995,1.207,1.402,1.382,1.408,1.369,1.416,1.509,1.615,1.667,1.98,2.0,1.701,1.557,1.392,1.516,1.227,0.958,0.672,0.551,0.758,0.979,0.822,0.605,0.561,0.515,0.593,0.589,0.69,0.577,0.602,0.732,0.624,0.526,0.569,0.747,0.85,0.961,1.235,1.542,1.699,1.579,1.474,1.463,1.547,1.511,1.435,1.32,1.21,0.984,0.769,0.549,0.579,0.6,0.863,0.843,0.704,0.53,0.507,0.481,0.496,0.598,0.749,0.878,0.727,0.766,0.92,1.023,1.168,1.132,1.147,1.009,0.977,1.026,1.135,1.157,1.21,1.22,1.253,1.312,1.295,1.216,1.116,0.936,0.898,0.994,0.936,0.86,0.886,0.932,0.798,0.693,0.603,0.672,0.704,0.691],"rep":[[0.0,0.239,0.356,0.847,0.979,1.098,1.408,1.375,1.483,1.242,1.308,1.252,1.593,1.514,2.023,1.645,1.69,2.032,2.173,2.047,1.428,1.123,0.606,0.716,1.447,1.446,0.859,0.376,0.301,0.341,0.592,0.749,0.812,0.567,0.765,0.914,0.511,0.256,0.472,0.509,0.619,0.927,1.403,1.691,1.794,1.94,2.013,2.275,2.455,1.96,1.801,1.645,1.452,0.744,0.529,0.226,0.79,0.745,0.929,0.809,0.721,0.664,0.408,0.214,0.369,0.662,0.719,0.795,0.359,0.931,1.61,1.577,1.624,1.274,1.151,0.845,1.097,1.418,1.478,1.508,1.534,1.723,1.896,2.039,2.036,1.5,1.389,1.479,1.531,1.579,1.509,1.378,1.494,1.433,0.896,1.227,1.522,1.609,1.315,1.254],[0.0,0.29,0.688,0.927,1.104,1.365,1.453,1.242,1.301,1.467,1.477,1.938,1.507,1.99,2.255,1.939,1.305,0.632,0.791,1.685,0.96,0.346,0.339,0.459,0.508,0.545,0.511,0.756,0.962,0.726,0.483,0.645,0.443,0.598,0.407,0.348,0.472,0.973,0.84,0.908,0.951,1.041,1.407,1.449,1.102,0.525,0.618,0.679,0.781,0.725,0.841,0.738,0.508,0.313,0.483,0.724,0.9,0.784,0.941,0.806,0.497,0.352,0.402,0.617,1.173,1.431,1.568,1.684,1.116,0.689,0.538,0.278,0.553,0.743,0.865,0.747,0.601,0.728,1.171,1.041,0.688,0.501,0.651,0.748,0.618,0.634,0.88,0.731,0.258,0.331,0.307,0.205,0.324,0.46,0.351,0.369,0.332,0.212,0.514,0.921],[0.0,0.235,0.337,0.808,0.907,1.022,1.356,1.377,1.494,1.302,1.353,1.302,1.561,1.479,1.908,1.719,1.418,1.573,1.549,1.523,0.963,0.77,0.517,0.583,1.115,1.567,1.03,0.532,0.282,0.379,0.447,0.713,0.756,0.635,0.602,0.853,0.699,0.345,0.338,0.44,0.539,0.762,1.307,1.728,1.97,2.04,2.205,2.233,2.621,2.602,2.099,2.084,1.813,1.544,0.723,0.601,0.483,0.888,0.851,1.01,0.783,0.694,0.553,0.284,0.189,0.466,0.717,0.835,0.682,0.437,1.277,1.689,1.636,1.662,1.296,1.085,0.982,1.221,1.523,1.467,1.48,1.517,1.661,1.737,1.689,1.416,0.779,0.892,0.99,0.94,0.889,0.753,1.059,1.33,0.872,0.418,0.532,0.683,0.754,0.485],[0.0,0.269,0.508,0.814,0.946,1.345,1.474,1.613,1.389,1.529,1.584,1.558,1.94,1.751,1.741,2.059,2.179,1.664,1.153,0.641,0.649,1.452,1.313,0.691,0.283,0.351,0.488,0.601,0.647,0.423,0.761,0.579,0.603,0.407,0.573,1.033,0.658,0.322,0.599,0.928,0.82,0.803,0.974,1.092,1.203,0.962,0.651,0.803,0.608,0.703,0.575,0.896,0.905,0.889,0.827,0.584,0.432,0.437,0.732,0.734,0.61,0.173,0.553,0.857,0.531,0.483,0.412,0.388,0.366,0.309,0.318,0.614,0.706,0.895,1.227,1.12,0.918,0.886,0.667,0.66,0.89,0.964,0.975,1.016,0.948,1.114,1.156,0.697,0.65,1.128,1.275,1.213,0.969,1.11,1.035,0.561,0.488,0.523,0.405,0.26],[0.0,0.278,0.632,0.97,1.091,1.399,1.402,1.308,1.33,1.339,1.522,1.799,1.715,1.765,2.287,2.689,2.132,1.679,0.744,1.182,1.664,0.918,0.343,0.322,0.471,0.539,0.582,0.474,0.757,0.919,0.916,0.334,0.73,0.385,0.545,0.518,0.451,0.418,0.787,1.232,1.364,1.27,0.985,1.272,1.579,1.312,0.887,0.44,0.614,0.708,0.825,0.687,0.818,0.798,0.619,0.446,0.368,0.484,1.006,0.994,0.734,0.602,0.507,0.31,0.329,0.292,0.643,0.775,0.92,1.213,1.151,0.754,0.616,0.35,0.415,0.689,0.841,0.776,0.631,0.649,1.077,1.029,0.773,0.61,0.621,0.694,0.635,0.569,0.8,0.742,0.365,0.343,0.336,0.206,0.329,0.481,0.361,0.363,0.33,0.21],[0.0,0.233,0.34,0.798,0.94,1.012,1.319,1.375,1.453,1.337,1.253,1.206,1.376,1.506,1.667,1.949,1.483,1.76,1.939,2.019,1.7,1.137,0.915,0.534,0.725,1.424,1.461,0.892,0.416,0.3,0.361,0.515,0.797,0.871,0.721,0.725,0.954,0.844,0.377,0.464,0.811,0.961,1.331,2.023,2.547,2.692,2.468,2.349,2.203,2.368,2.47,1.871,1.763,1.617,1.43,0.714,0.502,0.26,0.723,0.706,0.88,0.695,0.621,0.601,0.387,0.255,0.434,0.792,0.918,1.015,0.626,1.225,1.873,1.87,1.926,1.566,1.421,1.128,1.338,1.614,1.592,1.586,1.564,1.721,1.857,1.937,1.859,1.25,1.162,1.245,1.271,1.269,1.133,1.051,1.308,1.103,0.384,0.643,0.905,1.012]]}};
   var NS = 'http://www.w3.org/2000/svg';
   function el(name, attrs, parent) {
     var n = document.createElementNS(NS, name);
     for (var k in attrs) n.setAttribute(k, attrs[k]);
-    if (parent) parent.appendChild(n);
-    return n;
+    parent.appendChild(n); return n;
   }
-  // Bar with rounded top corners anchored to the baseline.
-  function barPath(x, y, w, h, r) {
-    r = Math.min(r, w / 2, h);
-    return 'M' + x + ',' + (y + h) + 'V' + (y + r) + 'Q' + x + ',' + y + ' ' + (x + r) + ',' + y +
-           'H' + (x + w - r) + 'Q' + (x + w) + ',' + y + ' ' + (x + w) + ',' + (y + r) + 'V' + (y + h) + 'Z';
-  }
-  function groupedBars(svgId, groups, series, opts) {
-    var svg = document.getElementById(svgId);
-    var W = opts.width, H = opts.height, m = { t: 26, r: 8, b: opts.bottom || 34, l: 30 };
+  var FIDCOL = { real: ['#ececec', 'rgba(236,236,236,0.22)'], robostress: ['#5ecbe0', 'rgba(94,203,224,0.28)'], gaussian: ['#b39cff', 'rgba(179,156,255,0.28)'] };
+  ['real', 'robostress', 'gaussian'].forEach(function (key) {
+    var svg = document.getElementById('fid-' + key), d = FID[key];
+    var W = 260, H = 190, m = { t: 8, r: 6, b: 22, l: 24 }, ymax = 3;
     svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
-    var iw = W - m.l - m.r, ih = H - m.t - m.b, max = opts.max;
-    var y = function (v) { return m.t + ih - v / max * ih; };
-    opts.ticks.forEach(function (t) {
-      el('line', { x1: m.l, x2: W - m.r, y1: y(t), y2: y(t), stroke: t === 0 ? '#c9ccd1' : '#eceef1', 'stroke-width': 1 }, svg);
-      var tx = el('text', { x: m.l - 6, y: y(t) + 4, 'text-anchor': 'end', 'font-size': 11, fill: '#7a808a' }, svg); tx.textContent = t;
+    var iw = W - m.l - m.r, ih = H - m.t - m.b, n = d.mean.length;
+    var x = function (i) { return m.l + i / (n - 1) * iw; };
+    var y = function (v) { return m.t + ih - Math.min(v, ymax) / ymax * ih; };
+    el('rect', { x: m.l, y: m.t, width: iw * 0.5, height: ih, fill: 'rgba(255,255,255,0.035)' }, svg);
+    el('text', { x: m.l + 5, y: m.t + 13, 'font-size': 10, fill: '#8a8a8a' }, svg).textContent = 'pre-grasp';
+    el('text', { x: m.l + iw - 5, y: m.t + 13, 'font-size': 10, fill: '#8a8a8a', 'text-anchor': 'end' }, svg).textContent = 'grasp';
+    [0, 1, 2, 3].forEach(function (t) {
+      el('line', { x1: m.l, x2: W - m.r, y1: y(t), y2: y(t), stroke: t === 0 ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.07)' }, svg);
+      el('text', { x: m.l - 5, y: y(t) + 4, 'text-anchor': 'end', 'font-size': 10, fill: '#8a8a8a' }, svg).textContent = t;
     });
-    var gw = iw / groups.length, gap = 2, pad = gw * (opts.groupPad || 0.18);
-    var bw = (gw - 2 * pad - gap * (series.length - 1)) / series.length;
-    groups.forEach(function (g, gi) {
-      var gx = m.l + gi * gw + pad;
-      series.forEach(function (s, si) {
-        var v = g.values[si], x = gx + si * (bw + gap);
-        var p = el('path', { d: barPath(x, y(v), bw, y(0) - y(v), 4), fill: s.color, class: 'bar' }, svg);
-        p.addEventListener('mousemove', function (e) { showTip(e, g.full + ' &middot; ' + s.name + ': <b>' + (opts.decimals ? v.toFixed(opts.decimals) : v) + '%</b>'); });
-        p.addEventListener('mouseleave', hideTip);
-        var t = el('text', { x: x + bw / 2, y: y(v) - 5, 'text-anchor': 'middle', 'font-size': opts.valueSize || 11,
-                             fill: si === series.length - 1 ? '#1f2328' : '#4a4f57', 'font-weight': si === series.length - 1 ? 'bold' : 'normal' }, svg);
-        t.textContent = opts.decimals ? v.toFixed(opts.decimals) : v;
-      });
-      if (opts.delta) {
-        var d = g.values[series.length - 1] - g.values[0];
-        var dt = el('text', { x: gx + (gw - 2 * pad) / 2, y: m.t - 10, 'text-anchor': 'middle', 'font-size': 12, 'font-weight': 'bold', fill: '#1f2328' }, svg);
-        dt.textContent = '+' + (Math.round(d * 10) / 10) + (opts.deltaUnit || '');
-      }
-      var lbl = el('text', { x: gx + (gw - 2 * pad) / 2, y: H - m.b + 18, 'text-anchor': 'middle', 'font-size': 12, fill: '#1f2328' }, svg);
-      lbl.innerHTML = g.label;
-    });
-  }
-  var cBase = { name: 'Base', color: '#2a78d6' }, cDR = { name: 'DR', color: '#1baf7a' },
-      cRV = { name: 'RobustVLA', color: '#eda100' }, cOurs = { name: 'Ours', color: '#e34948' };
+    el('text', { x: m.l + iw / 2, y: H - 5, 'text-anchor': 'middle', 'font-size': 10, fill: '#8a8a8a' }, svg).textContent = 'normalized time';
+    function line(vals, color, w) {
+      el('path', { d: vals.map(function (v, i) { return (i ? 'L' : 'M') + x(i).toFixed(1) + ',' + y(v).toFixed(1); }).join(''),
+                   fill: 'none', stroke: color, 'stroke-width': w, 'stroke-linejoin': 'round' }, svg);
+    }
+    d.rep.forEach(function (r) { line(r, FIDCOL[key][1], 1); });
+    line(d.mean, FIDCOL[key][0], 2);
+  });
 
-  groupedBars('chart-real', [
-    { label: 'A &#183; &#960;0.5', full: 'Robot A, &pi;<sub>0.5</sub>', values: [43, 52, 76] },
-    { label: 'A &#183; &#960;0', full: 'Robot A, &pi;<sub>0</sub>', values: [40, 47, 72] },
-    { label: 'B &#183; &#960;0.5', full: 'Robot B, &pi;<sub>0.5</sub>', values: [43, 50, 74] },
-    { label: 'B &#183; &#960;0', full: 'Robot B, &pi;<sub>0</sub>', values: [38, 49, 71] }
-  ], [cBase, cRV, cOurs], { width: 520, height: 250, max: 100, ticks: [0, 25, 50, 75, 100], delta: true, deltaUnit: 'pp' });
-
-
-  groupedBars('chart-sim', [
-    { label: '&#960;0.5', full: '&pi;<sub>0.5</sub>', values: [49.1, 51.0, 49.8, 56.6] },
-    { label: '&#960;0', full: '&pi;<sub>0</sub>', values: [41.7, 39.8, 38.8, 44.2] }
-  ], [cBase, cDR, cRV, cOurs], { width: 560, height: 250, max: 70, ticks: [0, 20, 40, 60], groupPad: 0.14, decimals: 1 });
+  // ---------- Copy BibTeX ----------
+  document.getElementById('copy-bib').addEventListener('click', function () {
+    var b = this, txt = document.getElementById('bibtex').textContent;
+    (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(function () {
+      b.querySelector('span').textContent = 'Copied';
+      setTimeout(function () { b.querySelector('span').textContent = 'Copy'; }, 1500);
+    }).catch(function () {});
+  });
 })();
 </script>
-
 </body>
 </html>
